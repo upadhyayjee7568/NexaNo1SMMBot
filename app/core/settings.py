@@ -19,5 +19,10 @@ class Settings(BaseSettings):
     database_url: str = Field(default="postgresql://nexa:nexa_change_me@postgres:5432/nexa_smm", alias="DATABASE_URL")
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
 
+    provider_1_base_url: str = Field(default="https://justanotherpanel.com/api/v2", alias="PROVIDER_1_BASE_URL")
+    provider_1_api_key: str = Field(default="", alias="PROVIDER_1_API_KEY")
+    provider_2_base_url: str = Field(default="https://peakerr.com/api/v2", alias="PROVIDER_2_BASE_URL")
+    provider_2_api_key: str = Field(default="", alias="PROVIDER_2_API_KEY")
+
 
 settings = Settings()

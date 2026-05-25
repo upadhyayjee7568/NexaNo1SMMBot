@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+import httpx
+
+
+@dataclass
+class ProviderClient:
+    name: str
+    base_url: str
+    api_key: str
+
+    async def create_order(self, service: int, link: str, quantity: int) -> dict[str, Any]:
+        payload = {
+            "key": self.api_key,
+            "action": "add",
+            "service": service,
+            "link": link,
+            "quantity": quantity,
+        }
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(self.base_url, data=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def status(self, order: str) -> dict[str, Any]:
+        payload = {"key": self.api_key, "action": "status", "order": order}
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(self.base_url, data=payload)
+            r.raise_for_status()
+            return r.json()
