@@ -1,3 +1,4 @@
+"""Sync services catalog from providers into DB and JSON snapshot."""
 """Sync services catalog from providers.
 
 Usage:
@@ -9,6 +10,8 @@ from pathlib import Path
 
 from app.core.settings import settings
 from app.services.providers import ProviderClient
+from app.services.catalog_sync import upsert_services
+from app.db.session import SessionLocal
 
 OUT_FILE = Path("data/provider_services_snapshot.json")
 
@@ -20,6 +23,21 @@ async def main() -> None:
     ]
 
     snapshot: dict[str, list[dict]] = {}
+    db = SessionLocal()
+    try:
+        for p in providers:
+            if not p.api_key:
+                snapshot[p.name] = [{"error": "missing_api_key"}]
+                continue
+            try:
+                services = await p.services()
+                snapshot[p.name] = services
+                upserted = upsert_services(db, p.name, services)
+                print(f"{p.name}: upserted {upserted} services")
+            except Exception as exc:  # noqa: BLE001
+                snapshot[p.name] = [{"error": str(exc)}]
+    finally:
+        db.close()
     for p in providers:
         if not p.api_key:
             snapshot[p.name] = [{"error": "missing_api_key"}]

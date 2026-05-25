@@ -1,4 +1,5 @@
 from datetime import datetime
+from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Numeric, Text, UniqueConstraint
 from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -7,6 +8,10 @@ from app.db.base import Base
 
 class User(Base):
     __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    role: Mapped[str] = mapped_column(String(24), default="user")
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
@@ -16,6 +21,29 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class ServiceCatalog(Base):
+    __tablename__ = "service_catalog"
+    __table_args__ = (UniqueConstraint("provider_name", "provider_service_id", name="uq_provider_service"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_name: Mapped[str] = mapped_column(String(64), index=True)
+    provider_service_id: Mapped[str] = mapped_column(String(64), index=True)
+    platform: Mapped[str] = mapped_column(String(64), index=True)
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    service_name: Mapped[str] = mapped_column(String(255))
+    base_rate: Mapped[float] = mapped_column(Numeric(12, 6), default=0)
+    min_qty: Mapped[int] = mapped_column(Integer, default=1)
+    max_qty: Mapped[int] = mapped_column(Integer, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WalletLedger(Base):
+    __tablename__ = "wallet_ledger"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    entry_type: Mapped[str] = mapped_column(String(32))
 class WalletLedger(Base):
     __tablename__ = "wallet_ledger"
 

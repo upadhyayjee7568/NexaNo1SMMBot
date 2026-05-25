@@ -53,6 +53,8 @@ python -m pytest -q
 - `POST /api/admin/users/role` (superadmin required via `X-Telegram-Id`)
 - `POST /api/admin/users/ban` (support+ required via `X-Telegram-Id`)
 - `GET /api/admin/orders` (support+ required via `X-Telegram-Id`)
+
+- `GET /api/services/catalog` — DB-backed service catalog (optional `platform` filter).
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh

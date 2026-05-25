@@ -7,6 +7,7 @@ from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger, ServiceCatalog
 from app.db.models import Order, User, WalletLedger
 from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger
@@ -254,6 +255,31 @@ def admin_orders(
                 'amount': str(o.charge_amount),
             }
             for o in data
+        ],
+    }
+
+
+@router.get('/services/catalog')
+def services_catalog(platform: str | None = None, db: Session = Depends(get_db)) -> dict:
+    q = db.query(ServiceCatalog).filter(ServiceCatalog.enabled == True)  # noqa: E712
+    if platform:
+        q = q.filter(ServiceCatalog.platform == platform)
+    data = q.order_by(ServiceCatalog.id.desc()).limit(1000).all()
+    return {
+        'count': len(data),
+        'services': [
+            {
+                'id': x.id,
+                'provider_name': x.provider_name,
+                'provider_service_id': x.provider_service_id,
+                'platform': x.platform,
+                'category': x.category,
+                'service_name': x.service_name,
+                'base_rate': str(x.base_rate),
+                'min_qty': x.min_qty,
+                'max_qty': x.max_qty,
+            }
+            for x in data
         ],
     }
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
