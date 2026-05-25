@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     timezone: str = Field(default="Asia/Kolkata", alias="TIMEZONE")
 
     telegram_bot_username: str = Field(default="NexaNo1SMMBot", alias="TELEGRAM_BOT_USERNAME")
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    telegram_support_username: str = Field(default="NexaNo1Support", alias="TELEGRAM_SUPPORT_USERNAME")
+    telegram_updates_channel: str = Field(default="https://t.me/NexaNo1Updates", alias="TELEGRAM_UPDATES_CHANNEL")
+    telegram_discussion_group: str = Field(default="@NexaCommunity", alias="TELEGRAM_DISCUSSION_GROUP")
+    telegram_force_join_enabled: bool = Field(default=True, alias="TELEGRAM_FORCE_JOIN_ENABLED")
+
+    payment_gateway: str = Field(default="cashfree", alias="PAYMENT_GATEWAY")
+    cashfree_mode: str = Field(default="LIVE", alias="CASHFREE_MODE")
+    cashfree_webhook_secret: str = Field(default="", alias="CASHFREE_WEBHOOK_SECRET")
     telegram_support_username: str = Field(default="NexaNo1Support", alias="TELEGRAM_SUPPORT_USERNAME")
 
     payment_gateway: str = Field(default="cashfree", alias="PAYMENT_GATEWAY")

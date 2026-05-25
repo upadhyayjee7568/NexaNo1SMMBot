@@ -45,6 +45,8 @@ python -m pytest -q
 
 - `scripts/run_all_crons.sh` — run all maintenance jobs sequentially.
 - `scripts/check_health.sh` — quick API health/config/platform smoke check.
+
+- `scripts/run_bot.sh` — run Telegram bot polling runtime (/start, /help, /support, force-join check).
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
