@@ -40,6 +40,8 @@ python -m pytest -q
 - `scripts/sync_services.py` — pull provider services snapshot.
 - `scripts/order_status_sync.py` — sync live order statuses from providers.
 - `scripts/bootstrap_admin.py` — create bootstrap super admin user.
+
+- `scripts/refund_failed_orders.py` — auto-refund failed/cancelled orders to wallet (idempotent).
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
