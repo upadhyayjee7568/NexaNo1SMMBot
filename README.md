@@ -42,6 +42,9 @@ python -m pytest -q
 - `scripts/bootstrap_admin.py` — create bootstrap super admin user.
 
 - `scripts/refund_failed_orders.py` — auto-refund failed/cancelled orders to wallet (idempotent).
+
+- `scripts/run_all_crons.sh` — run all maintenance jobs sequentially.
+- `scripts/check_health.sh` — quick API health/config/platform smoke check.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
