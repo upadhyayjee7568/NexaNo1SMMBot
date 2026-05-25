@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     provider_1_api_key: str = Field(default="", alias="PROVIDER_1_API_KEY")
     provider_2_base_url: str = Field(default="https://peakerr.com/api/v2", alias="PROVIDER_2_BASE_URL")
     provider_2_api_key: str = Field(default="", alias="PROVIDER_2_API_KEY")
+    cashfree_webhook_secret: str = Field(default="", alias="CASHFREE_WEBHOOK_SECRET")
 
 
 settings = Settings()
