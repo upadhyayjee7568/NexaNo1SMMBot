@@ -8,6 +8,11 @@ from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger, ServiceCatalog
+from app.services.order_engine import place_order
+from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
+from app.services.platforms import platform_catalog
+from app.services.wallet import wallet_balance, add_ledger_entry
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
 from app.db.models import Order, User, WalletLedger
 from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger
@@ -282,6 +287,80 @@ def services_catalog(platform: str | None = None, db: Session = Depends(get_db))
             for x in data
         ],
     }
+
+
+@router.get('/orders/track/{client_order_id}')
+async def order_track(client_order_id: str, db: Session = Depends(get_db)) -> dict:
+    order = db.query(Order).filter(Order.client_order_id == client_order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+    status = await refresh_order_status(order)
+    db.commit()
+    return {
+        'client_order_id': order.client_order_id,
+        'provider_order_id': order.provider_order_id,
+        'provider_name': order.provider_name,
+        'status': status,
+    }
+
+
+@router.post('/orders/refill/{client_order_id}')
+async def order_refill(
+    client_order_id: str,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    order = db.query(Order).filter(Order.client_order_id == client_order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+    if actor.role == 'user' and actor.id != order.user_id:
+        raise HTTPException(status_code=403, detail='Not your order')
+
+    result = await request_refill(order)
+    return {'ok': True, 'result': result, 'client_order_id': client_order_id}
+
+
+@router.post('/orders/cancel/{client_order_id}')
+async def order_cancel(
+    client_order_id: str,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    order = db.query(Order).filter(Order.client_order_id == client_order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+    if actor.role == 'user' and actor.id != order.user_id:
+        raise HTTPException(status_code=403, detail='Not your order')
+
+    result = await request_cancel(order)
+    if result.get('status') in {'success', 'cancelled', 'canceled'}:
+        order.status = 'cancelled'
+        db.commit()
+    return {'ok': True, 'result': result, 'client_order_id': client_order_id}
+
+
+@router.post('/admin/orders/retry/{client_order_id}')
+async def admin_order_retry(
+    client_order_id: str,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'admin')
+
+    order = db.query(Order).filter(Order.client_order_id == client_order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail='Order not found')
+
+    result = await place_order(order.service_id, order.link, order.quantity, base_rate=1.0)
+    if result.get('status') == 'created':
+        order.provider_name = result['provider']
+        order.provider_order_id = result.get('provider_order_id')
+        order.status = 'created'
+        db.commit()
+    return {'ok': True, 'retry_result': result, 'client_order_id': client_order_id}
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}

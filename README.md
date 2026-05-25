@@ -55,6 +55,13 @@ python -m pytest -q
 - `GET /api/admin/orders` (support+ required via `X-Telegram-Id`)
 
 - `GET /api/services/catalog` — DB-backed service catalog (optional `platform` filter).
+
+
+## Order Lifecycle APIs
+- `GET /api/orders/track/{client_order_id}` — live provider status refresh + return local status.
+- `POST /api/orders/refill/{client_order_id}` — submit refill request to provider.
+- `POST /api/orders/cancel/{client_order_id}` — submit cancel request to provider.
+- `POST /api/admin/orders/retry/{client_order_id}` — admin retry routing for failed orders.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
