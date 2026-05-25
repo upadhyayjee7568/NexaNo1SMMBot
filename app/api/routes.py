@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger
 from app.db.models import Order, User
 from app.services.order_engine import place_order
 from app.services.platforms import platform_catalog
@@ -82,6 +83,37 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         db.add(order)
         add_ledger_entry(db, user.id, 'debit', Decimal(str(result['charged_amount'])), reference_id=result['order_id'])
         db.commit()
+    return result
+
+
+@router.get('/orders/{telegram_id}')
+def order_history(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'telegram_id': telegram_id, 'orders': [], 'count': 0}
+
+    orders = (
+        db.query(Order)
+        .filter(Order.user_id == user.id)
+        .order_by(Order.id.desc())
+        .limit(100)
+        .all()
+    )
+    data = [
+        {
+            'client_order_id': o.client_order_id,
+            'provider_name': o.provider_name,
+            'provider_order_id': o.provider_order_id,
+            'service_id': o.service_id,
+            'quantity': o.quantity,
+            'charge_amount': str(o.charge_amount),
+            'status': o.status,
+        }
+        for o in orders
+    ]
+    return {'telegram_id': telegram_id, 'orders': data, 'count': len(data)}
+
+
     db.commit()
     return result
 
@@ -93,6 +125,32 @@ def get_wallet(telegram_id: int, db: Session = Depends(get_db)) -> dict:
         return {'telegram_id': telegram_id, 'balance': '0.00', 'currency': 'INR'}
     balance = wallet_balance(db, user.id)
     return {'telegram_id': telegram_id, 'balance': str(balance), 'currency': 'INR'}
+
+
+@router.get('/wallet/{telegram_id}/ledger')
+def wallet_ledger(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'telegram_id': telegram_id, 'entries': [], 'count': 0}
+
+    entries = (
+        db.query(WalletLedger)
+        .filter(WalletLedger.user_id == user.id)
+        .order_by(WalletLedger.id.desc())
+        .limit(100)
+        .all()
+    )
+    data = [
+        {
+            'entry_type': e.entry_type,
+            'amount': str(e.amount),
+            'reference_id': e.reference_id,
+            'note': e.note,
+            'created_at': e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in entries
+    ]
+    return {'telegram_id': telegram_id, 'entries': data, 'count': len(data)}
 
 
 @router.post('/payments/cashfree/webhook')
@@ -114,6 +172,14 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
             db.flush()
 
         ref = str(payload.get('order_id', 'cashfree'))
+        exists = (
+            db.query(WalletLedger)
+            .filter(WalletLedger.user_id == user.id, WalletLedger.reference_id == ref, WalletLedger.entry_type == 'credit')
+            .first()
+        )
+        if exists:
+            return {'ok': True, 'skipped': 'duplicate_webhook'}
+
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
         db.commit()
 
