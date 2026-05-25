@@ -24,6 +24,7 @@ class CreateOrderRequest(BaseModel):
     platform: str
     service_id: int
     quantity: int = Field(gt=0)
+    link: HttpUrl
     link: str
 
 
@@ -33,3 +34,10 @@ class CreateOrderResponse(BaseModel):
     status: Literal["created", "queued", "failed"]
     charged_amount: float
     currency: Literal["INR"] = "INR"
+
+
+class CashfreeWebhookPayload(BaseModel):
+    order_id: str | None = None
+    order_amount: float = 0
+    order_status: str | None = None
+    customer_details: dict = Field(default_factory=dict)

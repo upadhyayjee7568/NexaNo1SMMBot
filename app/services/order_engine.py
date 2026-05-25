@@ -25,6 +25,12 @@ def _provider_clients() -> list[ProviderClient]:
 
 async def place_order(service_id: int, link: str, quantity: int, base_rate: float, category: str | None = None) -> dict[str, Any]:
     provider_errors: list[dict[str, str]] = []
+
+    for provider in _provider_clients():
+        if not provider.api_key:
+            provider_errors.append({"provider": provider.name, "error": "missing_api_key"})
+            continue
+
     for provider in _provider_clients():
         try:
             result = await provider.create_order(service=service_id, link=link, quantity=quantity)
@@ -42,6 +48,7 @@ async def place_order(service_id: int, link: str, quantity: int, base_rate: floa
             provider_errors.append({"provider": provider.name, "error": str(result)})
         except Exception as e:  # noqa: BLE001
             provider_errors.append({"provider": provider.name, "error": str(e)})
+
     return {
         "order_id": str(uuid4()),
         "provider": "none",

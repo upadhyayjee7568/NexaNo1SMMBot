@@ -1,4 +1,5 @@
 from decimal import Decimal
+from fastapi import APIRouter, Depends, Request, Header, HTTPException
 from fastapi import APIRouter, Depends, Request, Header
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,7 @@ from app.db.models import Order, User
 from app.services.order_engine import place_order
 from app.services.platforms import platform_catalog
 from app.services.wallet import wallet_balance, add_ledger_entry
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
 from app.services.cashfree_webhook import verify_cashfree_signature
 from fastapi import APIRouter
 
@@ -57,6 +59,12 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         db.add(user)
         db.flush()
 
+    balance = wallet_balance(db, user.id)
+    estimated_charge = Decimal(str(round(payload.quantity * 1.25, 2)))
+    if balance < estimated_charge:
+        raise HTTPException(status_code=400, detail='Insufficient wallet balance')
+
+    result = await place_order(payload.service_id, str(payload.link), payload.quantity, base_rate=1.0)
     result = await place_order(payload.service_id, payload.link, payload.quantity, base_rate=1.0)
     if result.get('status') == 'created':
         order = Order(
@@ -65,6 +73,7 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
             provider_name=result['provider'],
             provider_order_id=result.get('provider_order_id'),
             service_id=payload.service_id,
+            link=str(payload.link),
             link=payload.link,
             quantity=payload.quantity,
             charge_amount=Decimal(str(result['charged_amount'])),
@@ -72,6 +81,7 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         )
         db.add(order)
         add_ledger_entry(db, user.id, 'debit', Decimal(str(result['charged_amount'])), reference_id=result['order_id'])
+        db.commit()
     db.commit()
     return result
 
@@ -90,6 +100,10 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
     raw = await request.body()
     verify_cashfree_signature(raw, x_cashfree_signature)
     payload = await request.json()
+
+    if not is_success_event(payload.get('order_status')):
+        return {'ok': True, 'skipped': 'non_success_status'}
+
     telegram_id = int(payload.get('customer_details', {}).get('customer_id', 0) or 0)
     amount = Decimal(str(payload.get('order_amount', '0')))
     if telegram_id and amount > 0:
@@ -98,6 +112,12 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
             user = User(telegram_id=telegram_id)
             db.add(user)
             db.flush()
+
+        ref = str(payload.get('order_id', 'cashfree'))
+        add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
+        db.commit()
+
+    return {'ok': True}
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}
