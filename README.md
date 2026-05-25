@@ -47,6 +47,12 @@ python -m pytest -q
 - `scripts/check_health.sh` — quick API health/config/platform smoke check.
 
 - `scripts/run_bot.sh` — run Telegram bot polling runtime (/start, /help, /support, force-join check).
+
+
+## RBAC Admin APIs
+- `POST /api/admin/users/role` (superadmin required via `X-Telegram-Id`)
+- `POST /api/admin/users/ban` (support+ required via `X-Telegram-Id`)
+- `GET /api/admin/orders` (support+ required via `X-Telegram-Id`)
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh

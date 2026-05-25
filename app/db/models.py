@@ -11,6 +11,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    role: Mapped[str] = mapped_column(String(24), default="user")  # user/support/admin/superadmin
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -20,6 +21,7 @@ class WalletLedger(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    entry_type: Mapped[str] = mapped_column(String(32))
     entry_type: Mapped[str] = mapped_column(String(32))  # credit/debit/refund/adjustment
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(8), default="INR")

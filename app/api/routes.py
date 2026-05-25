@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.models import CreateOrderRequest
 from app.core.settings import settings
+from app.core.rbac import get_actor, require_role
+from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger
 from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger
 from app.db.models import Order, User
@@ -184,6 +187,75 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
         db.commit()
 
     return {'ok': True}
+
+
+@router.post('/admin/users/role')
+def set_user_role(
+    telegram_id: int,
+    role: str,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'superadmin')
+
+    allowed = {'user', 'support', 'admin', 'superadmin'}
+    role = role.lower()
+    if role not in allowed:
+        raise HTTPException(status_code=400, detail='Invalid role')
+
+    target = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not target:
+        target = User(telegram_id=telegram_id, role=role)
+        db.add(target)
+    else:
+        target.role = role
+    db.commit()
+    return {'ok': True, 'telegram_id': telegram_id, 'role': role}
+
+
+@router.post('/admin/users/ban')
+def ban_user(
+    telegram_id: int,
+    ban: bool = True,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'support')
+
+    target = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not target:
+        target = User(telegram_id=telegram_id, is_banned=ban)
+        db.add(target)
+    else:
+        target.is_banned = ban
+    db.commit()
+    return {'ok': True, 'telegram_id': telegram_id, 'is_banned': ban}
+
+
+@router.get('/admin/orders')
+def admin_orders(
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'support')
+
+    data = db.query(Order).order_by(Order.id.desc()).limit(200).all()
+    return {
+        'count': len(data),
+        'orders': [
+            {
+                'client_order_id': o.client_order_id,
+                'user_id': o.user_id,
+                'provider': o.provider_name,
+                'status': o.status,
+                'amount': str(o.charge_amount),
+            }
+            for o in data
+        ],
+    }
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}
