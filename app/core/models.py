@@ -25,6 +25,7 @@ class CreateOrderRequest(BaseModel):
     service_id: int
     quantity: int = Field(gt=0)
     link: HttpUrl
+    link: str
 
 
 class CreateOrderResponse(BaseModel):

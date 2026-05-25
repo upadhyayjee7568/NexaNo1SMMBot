@@ -7,6 +7,9 @@ Production-ready starter backend for **Nexa SMM Panel** with secure config templ
 - Launch-ready multi-platform catalog (Instagram, Telegram, YouTube, Facebook + more).
 - Cashfree-only payment configuration approach.
 - SQLAlchemy models + Alembic migration for users, orders, and wallet ledger.
+- FastAPI backend scaffold (`app/`) with health + config + platform services endpoints.
+- Launch-ready multi-platform catalog (Instagram, Telegram, YouTube, Facebook + more).
+- Cashfree-only payment configuration approach.
 - Production env template (`.env.production.example`) and security guide (`SECURITY_SETUP.md`).
 - Dockerized deployment (`Dockerfile`, `docker-compose.yml`, `scripts/deploy.sh`).
 
@@ -37,3 +40,34 @@ python -m pytest -q
 - `scripts/sync_services.py` — pull provider services snapshot.
 - `scripts/order_status_sync.py` — sync live order statuses from providers.
 - `scripts/bootstrap_admin.py` — create bootstrap super admin user.
+3. Run deployment:
+   ```bash
+   ./scripts/deploy.sh
+   ```
+4. Verify:
+   - `GET /api/health`
+   - `GET /api/config/summary`
+   - `GET /api/services/platforms`
+
+## Services Platforms (launch)
+- Instagram
+- YouTube
+- Telegram
+- Facebook
+- X
+- TikTok
+- LinkedIn
+- Spotify
+- Threads
+- Snapchat
+- Pinterest
+- Website Traffic
+
+## Notes
+- Never commit real secrets.
+- Rotate any token/key shared in public channels.
+Configuration baseline for **Nexa Media Solution / Nexa SMM Panel**.
+
+## Files
+- `PROJECT_SETUP.md` — business + product requirements snapshot.
+- `config.nexa.example.yaml` — implementation-ready config template (replace placeholder secrets before production use).
