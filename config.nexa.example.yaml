@@ -1,0 +1,137 @@
+project:
+  name: "Nexa Media Solution"
+  bot_display_name: "Nexa SMM Panel"
+  bot_username: "@NexaNo1SMMBot"
+  support_username: "@NexaNo1Support"
+  timezone: "Asia/Kolkata"
+  default_language: "hinglish"
+
+telegram:
+  channel: "https://t.me/NexaNo1Updates"
+  discussion_group: "@NexaCommunity"
+  force_join_flow:
+    enabled: true
+    order: ["channel", "group", "bot"]
+  welcome_message: |
+    Welcome to Nexa SMM Panel 🚀
+    Fast, secure, and reliable social media growth services.
+    ✅ Instant Order Processing
+    ✅ Secure Payments (Cashfree)
+    ✅ 24×7 Support
+    Start here: /start
+  pinned_onboarding:
+    - "Join updates channel"
+    - "Join community group"
+    - "Start the bot"
+    - "Add wallet balance"
+    - "Select service & place your order"
+
+admins:
+  super_admin_ids: [6646320334]
+  admin_usernames: ["@NexaNo1Support"]
+  roles: ["SuperAdmin", "Admin", "Support"]
+  panel_2fa_enabled: true
+
+payments:
+  gateway: "cashfree"
+  mode: "live"
+  cashfree_app_id: "104929343d4e4107a5ca08529a03929401"
+  cashfree_secret_key: "REPLACE_WITH_REAL_SECRET"
+  webhook_secret: "REPLACE_WITH_WEBHOOK_SECRET"
+  webhook_url: "https://yourdomain.com/api/cashfree/webhook"
+  min_add_money_inr: 100
+  auto_credit_on_webhook: true
+
+wallet:
+  currency: "INR"
+  transaction_fee_handling: "user_bear"
+  failed_order_auto_refund_wallet: true
+  wallet_expiry: "none"
+  manual_admin_adjustment_allowed: true
+
+providers:
+  - name: "JustAnotherPanel"
+    base_url: "https://justanotherpanel.com/api/v2"
+    api_key: "REPLACE_WITH_PROVIDER1_KEY"
+    actions: ["create", "status", "refill", "cancel"]
+    priority: 1
+    fallback_allowed: true
+  - name: "Peakerr API"
+    base_url: "https://peakerr.com/api/v2"
+    api_key: "REPLACE_WITH_PROVIDER2_KEY"
+    actions: ["create", "status", "refill", "cancel"]
+    priority: 2
+    fallback_allowed: true
+
+pricing:
+  default_markup_percent: 25
+  category_markup_percent:
+    instagram_followers: 20
+    instagram_likes: 25
+    youtube_views: 30
+    telegram_members: 20
+  order_quantity_limits: "provider_based"
+  coupons_enabled: true
+  referral_enabled: true
+  referral_percent: 5
+  vip_tiers:
+    silver: 2
+    gold: 5
+    platinum: 10
+
+moderation:
+  blocked_words: ["spam", "abuse", "hack", "fraud"]
+  abuse_policy: "warn_then_instant_ban_on_repeat"
+  unban_request_template: "Hello admin, mera account galti se block ho gaya hai. Kindly review."
+  kyc_required: false
+  geo_restriction: "IN"
+
+features:
+  place_order: true
+  order_history: true
+  live_order_tracking: true
+  ticket_support: true
+  ai_faq_reply: true
+  broadcast_offers: true
+  referral_dashboard: true
+  daily_rewards: true
+  coupon_redemption: true
+  multi_language_switch: true
+
+web:
+  customer_web_app: true
+  admin_dashboard: true
+  admin_pages: ["orders", "users", "payments", "services", "reports", "tickets", "settings"]
+  export_reports: ["excel", "pdf"]
+  dark_mode: true
+
+infra:
+  deploy_target: "vps"
+  database: "postgresql"
+  redis_available: true
+  custom_domain: "panel.nexamediasolution.in"
+  ssl_provider: "cloudflare"
+  expected_daily_users: 500
+  expected_daily_orders: 200
+
+notifications:
+  telegram_admin_alerts: ["new_order", "failed_payment", "provider_failure", "abuse_reports"]
+  email_alerts: false
+  whatsapp_alerts: false
+
+legal:
+  terms_path: "/terms"
+  privacy_path: "/privacy"
+  refund_policy_path: "/refund-policy"
+
+build:
+  architecture_style: "enterprise_modular"
+  launch_priority: "fastest_with_robustness"
+  deadline: "asap"
+  must_have:
+    - "auto_service_sync_from_provider"
+    - "auto_price_update"
+    - "smart_provider_failover"
+    - "admin_broadcast"
+    - "anti_fraud_payment_verification"
+    - "user_level_discounts"

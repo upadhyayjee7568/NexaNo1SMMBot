@@ -1,0 +1,12 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
