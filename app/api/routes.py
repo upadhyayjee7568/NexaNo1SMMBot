@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.services.order_engine import place_order
+from app.core.settings import settings
 from app.services.platforms import platform_catalog
 
 router = APIRouter()
