@@ -1,4 +1,9 @@
 """Sync services catalog from providers into DB and JSON snapshot."""
+"""Sync services catalog from providers.
+
+Usage:
+  python scripts/sync_services.py
+"""
 import asyncio
 import json
 from pathlib import Path
@@ -33,6 +38,14 @@ async def main() -> None:
                 snapshot[p.name] = [{"error": str(exc)}]
     finally:
         db.close()
+    for p in providers:
+        if not p.api_key:
+            snapshot[p.name] = [{"error": "missing_api_key"}]
+            continue
+        try:
+            snapshot[p.name] = await p.services()
+        except Exception as exc:  # noqa: BLE001
+            snapshot[p.name] = [{"error": str(exc)}]
 
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_FILE.write_text(json.dumps(snapshot, indent=2))
