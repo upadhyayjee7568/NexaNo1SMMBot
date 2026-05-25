@@ -32,6 +32,14 @@ Production-ready starter backend for **Nexa SMM Panel** with secure config templ
 ```bash
 python -m pytest -q
 ```
+
+
+## Ops Scripts
+- `scripts/run_migrations.sh` — apply DB migrations.
+- `scripts/run_api.sh` — start API service.
+- `scripts/sync_services.py` — pull provider services snapshot.
+- `scripts/order_status_sync.py` — sync live order statuses from providers.
+- `scripts/bootstrap_admin.py` — create bootstrap super admin user.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
