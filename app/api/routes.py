@@ -1,5 +1,6 @@
 from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Header, HTTPException
+from fastapi import APIRouter, Depends, Request, Header
 from sqlalchemy.orm import Session
 
 from app.core.models import CreateOrderRequest
@@ -7,10 +8,21 @@ from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger
+from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger
+from app.db.models import Order, User
 from app.services.order_engine import place_order
 from app.services.platforms import platform_catalog
 from app.services.wallet import wallet_balance, add_ledger_entry
 from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
+from app.services.cashfree_webhook import verify_cashfree_signature
+from fastapi import APIRouter
+
+from app.core.models import CreateOrderRequest
+from app.core.settings import settings
+from app.services.order_engine import place_order
+from app.core.settings import settings
+from app.services.platforms import platform_catalog
 
 router = APIRouter()
 
@@ -57,6 +69,7 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail='Insufficient wallet balance')
 
     result = await place_order(payload.service_id, str(payload.link), payload.quantity, base_rate=1.0)
+    result = await place_order(payload.service_id, payload.link, payload.quantity, base_rate=1.0)
     if result.get('status') == 'created':
         order = Order(
             client_order_id=result['order_id'],
@@ -65,6 +78,7 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
             provider_order_id=result.get('provider_order_id'),
             service_id=payload.service_id,
             link=str(payload.link),
+            link=payload.link,
             quantity=payload.quantity,
             charge_amount=Decimal(str(result['charged_amount'])),
             status='created',
@@ -101,6 +115,10 @@ def order_history(telegram_id: int, db: Session = Depends(get_db)) -> dict:
         for o in orders
     ]
     return {'telegram_id': telegram_id, 'orders': data, 'count': len(data)}
+
+
+    db.commit()
+    return result
 
 
 @router.get('/wallet/{telegram_id}')
@@ -238,3 +256,40 @@ def admin_orders(
             for o in data
         ],
     }
+        add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
+        db.commit()
+    return {'ok': True}
+@router.get("/health")
+def health() -> dict:
+    return {"status": "ok", "service": settings.app_name, "env": settings.environment}
+
+
+@router.get("/config/summary")
+def config_summary() -> dict:
+    return {
+        "project_name": settings.project_name,
+        "bot_username": settings.telegram_bot_username,
+        "support_username": settings.telegram_support_username,
+        "payment_gateway": settings.payment_gateway,
+        "cashfree_mode": settings.cashfree_mode,
+        "timezone": settings.timezone,
+    }
+
+
+@router.get("/services/platforms")
+def services_platforms() -> dict:
+    return {"platforms": platform_catalog(), "count": len(platform_catalog())}
+
+
+@router.post("/orders/place")
+async def orders_place(payload: CreateOrderRequest) -> dict:
+    # base_rate placeholder until provider service sync table is added
+    base_rate = 1.0
+    result = await place_order(
+        service_id=payload.service_id,
+        link=payload.link,
+        quantity=payload.quantity,
+        base_rate=base_rate,
+        category=None,
+    )
+    return result
