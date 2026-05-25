@@ -18,6 +18,7 @@ class User(Base):
 
 class PaymentTransaction(Base):
     __tablename__ = "payment_transactions"
+    __table_args__ = (UniqueConstraint("gateway", "gateway_event_id", name="uq_gateway_event"),)
     __table_args__ = (
         UniqueConstraint("gateway", "gateway_event_id", name="uq_gateway_event"),
     )
@@ -74,6 +75,28 @@ class WalletLedger(Base):
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     reference_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user = relationship("User")
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+    __table_args__ = (UniqueConstraint("entry_ref", name="uq_journal_entry_ref"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_ref: Mapped[str] = mapped_column(String(128), index=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class JournalLine(Base):
+    __tablename__ = "journal_lines"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("journal_entries.id", ondelete="CASCADE"), index=True)
+    account_code: Mapped[str] = mapped_column(String(64), index=True)
+    direction: Mapped[str] = mapped_column(String(8))
+    amount: Mapped[float] = mapped_column(Numeric(12, 2))
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")

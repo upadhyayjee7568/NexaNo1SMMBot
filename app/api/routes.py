@@ -13,6 +13,8 @@ from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
 from app.services.platforms import platform_catalog
 from app.services.wallet import wallet_balance, add_ledger_entry
+from app.services.finance import post_double_entry, fetch_finance_daily_report
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event, extract_event_id, safe_dump
 from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event, extract_event_id, safe_dump
 from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
 from app.db.models import Order, User, WalletLedger
@@ -93,6 +95,7 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         )
         db.add(order)
         add_ledger_entry(db, user.id, 'debit', Decimal(str(result['charged_amount'])), reference_id=result['order_id'])
+        post_double_entry(db, entry_ref=f"order:{result['order_id']}", description='Order debit', debit_account='wallet_user', credit_account='revenue_hold', amount=Decimal(str(result['charged_amount'])), user_id=user.id)
         db.commit()
     return result
 
@@ -221,6 +224,10 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
         )
         if not exists:
             add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
+            post_double_entry(db, entry_ref=f"cashfree:{event_id}", description='Wallet topup via Cashfree', debit_account='cashfree_clearing', credit_account='wallet_user', amount=amount, user_id=user.id)
+
+    db.commit()
+    return {'ok': True, 'event_id': event_id}
 
     db.commit()
     return {'ok': True, 'event_id': event_id}
@@ -399,6 +406,17 @@ async def admin_order_retry(
         order.status = 'created'
         db.commit()
     return {'ok': True, 'retry_result': result, 'client_order_id': client_order_id}
+
+
+@router.get('/admin/finance/report/daily')
+def admin_finance_daily_report(
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'admin')
+    data = fetch_finance_daily_report(db)
+    return {'count': len(data), 'rows': data}
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}

@@ -62,6 +62,8 @@ python -m pytest -q
 - `POST /api/orders/refill/{client_order_id}` — submit refill request to provider.
 - `POST /api/orders/cancel/{client_order_id}` — submit cancel request to provider.
 - `POST /api/admin/orders/retry/{client_order_id}` — admin retry routing for failed orders.
+
+- `GET /api/admin/finance/report/daily` — export-ready daily finance aggregates (wallet ledger view).
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
