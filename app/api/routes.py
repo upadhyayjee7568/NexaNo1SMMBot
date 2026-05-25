@@ -7,11 +7,13 @@ from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction
 from app.db.models import Order, User, WalletLedger, ServiceCatalog
 from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
 from app.services.platforms import platform_catalog
 from app.services.wallet import wallet_balance, add_ledger_entry
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event, extract_event_id, safe_dump
 from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
 from app.db.models import Order, User, WalletLedger
 from app.db.session import SessionLocal
@@ -168,6 +170,36 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
     verify_cashfree_signature(raw, x_cashfree_signature)
     payload = await request.json()
 
+    event_id = extract_event_id(payload)
+    existing_txn = (
+        db.query(PaymentTransaction)
+        .filter(PaymentTransaction.gateway == 'cashfree', PaymentTransaction.gateway_event_id == event_id)
+        .first()
+    )
+    if existing_txn:
+        return {'ok': True, 'skipped': 'duplicate_event', 'event_id': event_id}
+
+    status = str(payload.get('order_status', 'received')).lower()
+    telegram_id = int(payload.get('customer_details', {}).get('customer_id', 0) or 0)
+    amount = Decimal(str(payload.get('order_amount', '0')))
+
+    txn = PaymentTransaction(
+        gateway='cashfree',
+        gateway_event_id=event_id,
+        order_id=str(payload.get('order_id', '')) or None,
+        telegram_id=telegram_id or None,
+        amount=amount,
+        currency='INR',
+        status=status,
+        raw_payload=safe_dump(payload),
+    )
+    db.add(txn)
+    db.flush()
+
+    if not is_success_event(payload.get('order_status')):
+        db.commit()
+        return {'ok': True, 'skipped': 'non_success_status', 'event_id': event_id}
+
     if not is_success_event(payload.get('order_status')):
         return {'ok': True, 'skipped': 'non_success_status'}
 
@@ -180,12 +212,18 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
             db.add(user)
             db.flush()
 
+        ref = f"cashfree:{event_id}"
         ref = str(payload.get('order_id', 'cashfree'))
         exists = (
             db.query(WalletLedger)
             .filter(WalletLedger.user_id == user.id, WalletLedger.reference_id == ref, WalletLedger.entry_type == 'credit')
             .first()
         )
+        if not exists:
+            add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
+
+    db.commit()
+    return {'ok': True, 'event_id': event_id}
         if exists:
             return {'ok': True, 'skipped': 'duplicate_webhook'}
 

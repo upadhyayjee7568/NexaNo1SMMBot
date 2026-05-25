@@ -12,6 +12,25 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(128), nullable=True)
     role: Mapped[str] = mapped_column(String(24), default="user")
+    is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+    __table_args__ = (
+        UniqueConstraint("gateway", "gateway_event_id", name="uq_gateway_event"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    gateway: Mapped[str] = mapped_column(String(32), index=True)
+    gateway_event_id: Mapped[str] = mapped_column(String(128), index=True)
+    order_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    telegram_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+    status: Mapped[str] = mapped_column(String(32), default="received")
+    raw_payload: Mapped[str] = mapped_column(Text)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
