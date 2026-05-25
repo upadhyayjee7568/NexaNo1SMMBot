@@ -64,6 +64,13 @@ python -m pytest -q
 - `POST /api/admin/orders/retry/{client_order_id}` — admin retry routing for failed orders.
 
 - `GET /api/admin/finance/report/daily` — export-ready daily finance aggregates (wallet ledger view).
+
+
+## Ticket APIs
+- `POST /api/tickets` — create ticket.
+- `GET /api/tickets/{telegram_id}` — list user tickets.
+- `GET /api/tickets/messages/{ticket_ref}` — list messages (owner/support).
+- `POST /api/admin/tickets/reply/{ticket_ref}` — support/admin reply and optional close.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh

@@ -7,6 +7,10 @@ from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage
+from app.services.order_engine import place_order
+from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
+from app.services.tickets import create_ticket
 from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction
 from app.db.models import Order, User, WalletLedger, ServiceCatalog
 from app.services.order_engine import place_order
@@ -417,6 +421,64 @@ def admin_finance_daily_report(
     require_role(actor, 'admin')
     data = fetch_finance_daily_report(db)
     return {'count': len(data), 'rows': data}
+
+
+@router.post('/tickets')
+def ticket_create(
+    telegram_id: int,
+    subject: str,
+    message: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    t = create_ticket(db, telegram_id=telegram_id, subject=subject, message=message)
+    return {'ok': True, 'ticket_ref': t.ticket_ref, 'status': t.status}
+
+
+@router.get('/tickets/{telegram_id}')
+def ticket_list(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'count': 0, 'tickets': []}
+    items = db.query(Ticket).filter(Ticket.user_id == user.id).order_by(Ticket.id.desc()).all()
+    return {'count': len(items), 'tickets': [{'ticket_ref': i.ticket_ref, 'subject': i.subject, 'status': i.status, 'priority': i.priority} for i in items]}
+
+
+@router.get('/tickets/messages/{ticket_ref}')
+def ticket_messages(
+    ticket_ref: str,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    t = db.query(Ticket).filter(Ticket.ticket_ref == ticket_ref).first()
+    if not t:
+        raise HTTPException(status_code=404, detail='Ticket not found')
+    if actor.role == 'user' and actor.id != t.user_id:
+        raise HTTPException(status_code=403, detail='Not your ticket')
+    msgs = db.query(TicketMessage).filter(TicketMessage.ticket_id == t.id).order_by(TicketMessage.id.asc()).all()
+    return {'ticket_ref': ticket_ref, 'count': len(msgs), 'messages': [{'sender_user_id': m.sender_user_id, 'message': m.message, 'is_staff': m.is_staff} for m in msgs]}
+
+
+@router.post('/admin/tickets/reply/{ticket_ref}')
+def admin_ticket_reply(
+    ticket_ref: str,
+    message: str,
+    close_ticket: bool = False,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'support')
+    t = db.query(Ticket).filter(Ticket.ticket_ref == ticket_ref).first()
+    if not t:
+        raise HTTPException(status_code=404, detail='Ticket not found')
+    db.add(TicketMessage(ticket_id=t.id, sender_user_id=actor.id, message=message, is_staff=True))
+    if close_ticket:
+        t.status = 'closed'
+    else:
+        t.status = 'open'
+    db.commit()
+    return {'ok': True, 'ticket_ref': ticket_ref, 'status': t.status}
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}
