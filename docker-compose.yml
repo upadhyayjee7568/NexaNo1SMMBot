@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: nexa-smm-api
+    env_file:
+      - .env.production
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexa-smm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: nexa-smm-postgres
+    environment:
+      POSTGRES_DB: nexa_smm
+      POSTGRES_USER: nexa
+      POSTGRES_PASSWORD: nexa_change_me
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata:
