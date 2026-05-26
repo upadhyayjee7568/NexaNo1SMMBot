@@ -1,6 +1,7 @@
 import csv
 import io
 
+from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
@@ -18,6 +19,14 @@ templates = Jinja2Templates(directory="app/web/templates")
 
 def _session(request: Request, db: Session):
     return get_session(db, request.cookies.get(settings.web_session_cookie_name))
+
+
+def _session_user(request: Request, db: Session) -> User:
+    sess = _session(request, db)
+    user = db.query(User).filter(User.id == sess.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail='Session user missing')
+    return user
 
 
 @router.get('/web/login')
@@ -41,6 +50,10 @@ def customer_home(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get('/app/wallet')
+def app_wallet(request: Request, db: Session = Depends(get_db)):
+    from app.services.wallet import wallet_balance
+    u = _session_user(request, db)
+    bal = str(wallet_balance(db, u.id))
 def app_wallet(request: Request, telegram_id: int, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     _session(request, db)
