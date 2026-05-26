@@ -87,6 +87,12 @@ python -m pytest -q
 - Admin dashboard URL: `/admin`
 - Web pages are server-rendered using Jinja templates.
 - Core admin/customer workflows are connected to existing backend services.
+
+
+## Anti-Fraud APIs
+- Auto risk scoring on order placement (blocked words + rate limit).
+- Auto-ban when cumulative risk threshold is reached.
+- `GET /api/admin/antifraud/user/{telegram_id}` (support+) for fraud audit view.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh

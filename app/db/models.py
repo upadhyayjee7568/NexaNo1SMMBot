@@ -171,4 +171,14 @@ class DailyReward(Base):
     reward_date: Mapped[datetime] = mapped_column(DateTime)
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class FraudEvent(Base):
+    __tablename__ = "fraud_events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(64))
+    risk_score: Mapped[int] = mapped_column(Integer, default=0)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     user = relationship("User")

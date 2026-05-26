@@ -12,6 +12,7 @@ from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
 from app.services.tickets import create_ticket
 from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
+from app.services.antifraud import evaluate_order_text_risk, compute_user_risk
 from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage
 from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
@@ -82,6 +83,10 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
         db.add(user)
         db.flush()
 
+    risk_score, bad_words, auto_block = evaluate_order_text_risk(db, payload.user_id, f"{payload.platform} {payload.link}")
+    if auto_block:
+        raise HTTPException(status_code=403, detail='User blocked by anti-fraud policy')
+
     balance = wallet_balance(db, user.id)
     estimated_charge = Decimal(str(round(payload.quantity * 1.25, 2)))
     if balance < estimated_charge:
@@ -146,6 +151,10 @@ def get_wallet(telegram_id: int, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not user:
         return {'telegram_id': telegram_id, 'balance': '0.00', 'currency': 'INR'}
+    risk_score, bad_words, auto_block = evaluate_order_text_risk(db, payload.user_id, f"{payload.platform} {payload.link}")
+    if auto_block:
+        raise HTTPException(status_code=403, detail='User blocked by anti-fraud policy')
+
     balance = wallet_balance(db, user.id)
     return {'telegram_id': telegram_id, 'balance': str(balance), 'currency': 'INR'}
 
@@ -545,6 +554,32 @@ def vip_status(telegram_id: int, db: Session = Depends(get_db)) -> dict:
     elif disc == Decimal('10'):
         tier = 'platinum'
     return {'tier': tier, 'discount_percent': str(disc), 'total_spend': str(total)}
+
+
+@router.get('/admin/antifraud/user/{telegram_id}')
+def admin_antifraud_user(
+    telegram_id: int,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'support')
+
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'found': False}
+    score = compute_user_risk(db, user.id)
+    events = db.query(FraudEvent).filter(FraudEvent.user_id == user.id).order_by(FraudEvent.id.desc()).limit(50).all()
+    return {
+        'found': True,
+        'telegram_id': telegram_id,
+        'risk_score': score,
+        'is_banned': user.is_banned,
+        'events': [
+            {'event_type': e.event_type, 'risk_score': e.risk_score, 'details': e.details, 'created_at': e.created_at.isoformat()}
+            for e in events
+        ],
+    }
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}
