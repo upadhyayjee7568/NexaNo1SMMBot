@@ -2,6 +2,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, Form, Request, HTTPException
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -53,6 +54,11 @@ def app_wallet(request: Request, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     u = _session_user(request, db)
     bal = str(wallet_balance(db, u.id))
+def app_wallet(request: Request, telegram_id: int, db: Session = Depends(get_db)):
+    from app.services.wallet import wallet_balance
+    _session(request, db)
+    u = db.query(User).filter(User.telegram_id == telegram_id).first()
+    bal = "0.00" if not u else str(wallet_balance(db, u.id))
     return templates.TemplateResponse('customer.html', {'request': request, 'result': f'wallet={bal} INR'})
 
 
