@@ -7,6 +7,11 @@ from app.core.models import CreateOrderRequest
 from app.core.settings import settings
 from app.core.rbac import get_actor, require_role
 from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage, Coupon, Referral, DailyReward
+from app.services.order_engine import place_order
+from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
+from app.services.tickets import create_ticket
+from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
 from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage
 from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
@@ -479,6 +484,67 @@ def admin_ticket_reply(
         t.status = 'open'
     db.commit()
     return {'ok': True, 'ticket_ref': ticket_ref, 'status': t.status}
+
+
+@router.post('/coupons/create')
+def coupon_create(
+    code: str,
+    discount_percent: float,
+    max_uses: int | None = None,
+    x_telegram_id: int | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    actor = get_actor(db, x_telegram_id)
+    require_role(actor, 'admin')
+    c = Coupon(code=code.upper(), discount_percent=discount_percent, max_uses=max_uses)
+    db.add(c)
+    db.commit()
+    return {'ok': True, 'code': c.code}
+
+
+@router.post('/coupons/apply')
+def coupon_apply(code: str, amount: float, db: Session = Depends(get_db)) -> dict:
+    final, status = apply_coupon(db, code=code, amount=Decimal(str(amount)))
+    return {'status': status, 'final_amount': str(final)}
+
+
+@router.post('/referrals/register')
+def referral_register(referrer_telegram_id: int, referred_telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    status = register_referral(db, referrer_tg=referrer_telegram_id, referred_tg=referred_telegram_id)
+    return {'status': status}
+
+
+@router.get('/referrals/{telegram_id}')
+def referral_dashboard(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'count': 0, 'items': []}
+    refs = db.query(Referral).filter(Referral.referrer_user_id == user.id).all()
+    return {'count': len(refs), 'items': [{'referred_user_id': r.referred_user_id, 'reward_percent': str(r.reward_percent)} for r in refs]}
+
+
+@router.post('/rewards/daily/claim')
+def daily_reward_claim(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    status = credit_daily_reward(db, telegram_id=telegram_id)
+    return {'status': status}
+
+
+@router.get('/vip/{telegram_id}')
+def vip_status(telegram_id: int, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        return {'tier': 'none', 'discount_percent': '0'}
+    spend = db.query(Order).filter(Order.user_id == user.id).with_entities(Order.charge_amount).all()
+    total = sum([Decimal(str(x[0])) for x in spend], Decimal('0'))
+    disc = vip_discount_percent(total)
+    tier = 'none'
+    if disc == Decimal('2'):
+        tier = 'silver'
+    elif disc == Decimal('5'):
+        tier = 'gold'
+    elif disc == Decimal('10'):
+        tier = 'platinum'
+    return {'tier': tier, 'discount_percent': str(disc), 'total_spend': str(total)}
         add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
         db.commit()
     return {'ok': True}

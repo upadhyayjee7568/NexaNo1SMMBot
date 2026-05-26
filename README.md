@@ -71,6 +71,15 @@ python -m pytest -q
 - `GET /api/tickets/{telegram_id}` — list user tickets.
 - `GET /api/tickets/messages/{ticket_ref}` — list messages (owner/support).
 - `POST /api/admin/tickets/reply/{ticket_ref}` — support/admin reply and optional close.
+
+
+## Growth APIs
+- `POST /api/coupons/create` (admin)
+- `POST /api/coupons/apply`
+- `POST /api/referrals/register`
+- `GET /api/referrals/{telegram_id}`
+- `POST /api/rewards/daily/claim`
+- `GET /api/vip/{telegram_id}`
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
