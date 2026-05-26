@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"><h2>Customer Web App</h2>
+<p>Place orders, check wallet, view order history, and claim daily reward.</p></div>
+
+<div class="card">
+<h3>Quick Actions</h3>
+<form method="get" action="/app/wallet">
+  <input name="telegram_id" placeholder="Telegram ID" required>
+  <button>Check Wallet</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Order History</h3>
+<form method="get" action="/app/orders">
+  <input name="telegram_id" placeholder="Telegram ID" required>
+  <button>View Orders</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Coupon Apply</h3>
+<form method="post" action="/app/coupon/apply">
+  <input name="code" placeholder="COUPON CODE" required>
+  <input name="amount" placeholder="Amount" required>
+  <button>Apply Coupon</button>
+</form>
+</div>
+{% if result %}<div class="card"><pre>{{ result }}</pre></div>{% endif %}
+{% endblock %}
