@@ -19,6 +19,11 @@ from app.services.wallet import wallet_balance
 from app.services.tickets import create_ticket
 from app.services.growth import credit_daily_reward, register_referral
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+from app.core.settings import settings
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,9 @@ WELCOME_TEXT = (
 ORDER_SERVICE, ORDER_LINK, ORDER_QTY = range(3)
 TICKET_SUBJECT, TICKET_MESSAGE = range(3, 5)
 
+    "Start here: /start"
+)
+
 
 async def _is_member(context: ContextTypes.DEFAULT_TYPE, chat_id: str, user_id: int) -> bool:
     try:
@@ -46,6 +54,9 @@ async def _is_member(context: ContextTypes.DEFAULT_TYPE, chat_id: str, user_id: 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user:
         return
+    if not update.effective_user or not update.effective_chat:
+        return
+
     user_id = update.effective_user.id
 
     if settings.telegram_force_join_enabled:
@@ -216,6 +227,43 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"Support: @{settings.telegram_support_username.lstrip('@')}")
 
 
+
+        if not (channel_ok and group_ok):
+            kb = [
+                [InlineKeyboardButton("Join Updates Channel", url=settings.telegram_updates_channel)],
+                [InlineKeyboardButton("Join Community Group", url=f"https://t.me/{settings.telegram_discussion_group.lstrip('@')}")],
+            ]
+            await update.message.reply_text(
+                "Access required before using bot:\n1) Join channel\n2) Join group\n3) Run /start again",
+                reply_markup=InlineKeyboardMarkup(kb),
+            )
+            return
+
+    await update.message.reply_text(WELCOME_TEXT)
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "Commands:\n"
+        "/start - Start bot\n"
+        "/help - Help menu\n"
+        "/support - Support contact\n"
+        "/wallet - Wallet API endpoint info"
+    )
+
+
+async def support(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(f"Support: @{settings.telegram_support_username.lstrip('@')}")
+
+
+async def wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id if update.effective_user else 0
+    await update.message.reply_text(
+        f"Wallet check API: GET /api/wallet/{user_id}\n"
+        "(Integrate this in bot UI next phase for live balance button)"
+    )
+
+
 def build_application() -> Application:
     if not settings.telegram_bot_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
@@ -249,6 +297,9 @@ def build_application() -> Application:
     ))
 
     app.add_handler(CallbackQueryHandler(menu_click, pattern="^menu_(wallet|reward|referral)$"))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("support", support))
+    app.add_handler(CommandHandler("wallet", wallet))
     return app
 
 
