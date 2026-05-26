@@ -107,6 +107,12 @@ python -m pytest -q
 - Multi-step order capture conversation.
 - Ticket create conversation from bot.
 - Daily reward + referral command support in bot runtime.
+
+
+## Phase D (Web Panel) Completed
+- Admin pages added: users, payments, services, tickets, settings.
+- Report export endpoints: CSV and PDF.
+- Customer + admin web app integrated with session auth from Phase A.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"><h2>Admin - Tickets</h2></div>
+<div class="card"><table><tr><th>Ref</th><th>User ID</th><th>Subject</th><th>Status</th><th>Priority</th></tr>
+{% for t in tickets %}<tr><td>{{t.ticket_ref}}</td><td>{{t.user_id}}</td><td>{{t.subject}}</td><td>{{t.status}}</td><td>{{t.priority}}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

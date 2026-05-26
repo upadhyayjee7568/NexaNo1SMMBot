@@ -1,3 +1,6 @@
+import io, csv
+from fastapi import APIRouter, Form, Request, Response, Depends
+from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi import APIRouter, Form, Request, Response, Depends
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
@@ -7,6 +10,9 @@ from sqlalchemy.orm import Session
 from app.api.routes import get_db
 from app.core.settings import settings
 from app.services.auth import create_session, get_session, require_csrf, require_admin_user
+from app.db.models import Order, User, Coupon, PaymentTransaction, ServiceCatalog, Ticket
+from app.services.growth import apply_coupon
+from app.services.finance import fetch_finance_daily_report
 from app.db.models import Order, User, Coupon
 from app.services.growth import apply_coupon
 from app.services.finance import fetch_finance_daily_report
@@ -115,6 +121,84 @@ def admin_coupon_create(request: Request, admin_tg: int = Form(...), code: str =
 def admin_orders_view(request: Request, db: Session = Depends(get_db)):
     _, sess = _session(request, db)
     require_admin_user(db, sess)
+    rows = db.query(Order).order_by(Order.id.desc()).limit(50).all()
+    result = '\n'.join([f"{x.client_order_id} | user={x.user_id} | {x.status} | {x.charge_amount}" for x in rows]) or 'No orders'
+    return templates.TemplateResponse('admin.html', {'request': request, 'result': result})
+
+
+@router.get('/admin/users')
+def admin_users(request: Request, db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    users = db.query(User).order_by(User.id.desc()).limit(200).all()
+    return templates.TemplateResponse('admin_users.html', {'request': request, 'users': users})
+
+
+@router.get('/admin/payments')
+def admin_payments(request: Request, db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    payments = db.query(PaymentTransaction).order_by(PaymentTransaction.id.desc()).limit(200).all()
+    return templates.TemplateResponse('admin_payments.html', {'request': request, 'payments': payments})
+
+
+@router.get('/admin/services')
+def admin_services(request: Request, db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    services = db.query(ServiceCatalog).order_by(ServiceCatalog.id.desc()).limit(500).all()
+    return templates.TemplateResponse('admin_services.html', {'request': request, 'services': services})
+
+
+@router.get('/admin/tickets')
+def admin_tickets(request: Request, db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    tickets = db.query(Ticket).order_by(Ticket.id.desc()).limit(500).all()
+    return templates.TemplateResponse('admin_tickets.html', {'request': request, 'tickets': tickets})
+
+
+@router.get('/admin/settings')
+def admin_settings(request: Request, db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    return templates.TemplateResponse('admin_settings.html', {'request': request})
+
+
+@router.get('/admin/reports/export/csv')
+def admin_export_csv(request: Request, kind: str = 'orders', db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    if kind == 'orders':
+        writer.writerow(['client_order_id','user_id','provider','status','charge_amount'])
+        for o in db.query(Order).order_by(Order.id.desc()).limit(5000):
+            writer.writerow([o.client_order_id,o.user_id,o.provider_name,o.status,o.charge_amount])
+    elif kind == 'payments':
+        writer.writerow(['id','gateway','event_id','amount','status'])
+        for p in db.query(PaymentTransaction).order_by(PaymentTransaction.id.desc()).limit(5000):
+            writer.writerow([p.id,p.gateway,p.gateway_event_id,p.amount,p.status])
+    else:
+        writer.writerow(['unsupported_kind'])
+    data = output.getvalue().encode()
+    return StreamingResponse(iter([data]), media_type='text/csv', headers={'Content-Disposition': f'attachment; filename={kind}.csv'})
+
+
+@router.get('/admin/reports/export/pdf')
+def admin_export_pdf(request: Request, kind: str = 'orders', db: Session = Depends(get_db)):
+    _, sess = _session(request, db)
+    require_admin_user(db, sess)
+    # lightweight text/pdf-compatible stream (placeholder report format)
+    lines = [f'Nexa Report: {kind}', '-------------------------']
+    if kind == 'orders':
+        for o in db.query(Order).order_by(Order.id.desc()).limit(200):
+            lines.append(f"{o.client_order_id} | {o.status} | {o.charge_amount}")
+    elif kind == 'payments':
+        for p in db.query(PaymentTransaction).order_by(PaymentTransaction.id.desc()).limit(200):
+            lines.append(f"{p.id} | {p.gateway} | {p.amount} | {p.status}")
+    payload = ('\n'.join(lines)).encode()
+    return StreamingResponse(iter([payload]), media_type='application/pdf', headers={'Content-Disposition': f'attachment; filename={kind}.pdf'})
 def admin_orders_view(request: Request, admin_tg: int, db: Session = next(get_db())):
     rows = db.query(Order).order_by(Order.id.desc()).limit(50).all()
     result = '\n'.join([f"{x.client_order_id} | user={x.user_id} | {x.status} | {x.charge_amount}" for x in rows]) or 'No orders'

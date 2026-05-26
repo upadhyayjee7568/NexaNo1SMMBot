@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"><h2>Admin - Services</h2></div>
+<div class="card"><table><tr><th>ID</th><th>Provider</th><th>Service</th><th>Platform</th><th>Rate</th><th>Enabled</th></tr>
+{% for s in services %}<tr><td>{{s.id}}</td><td>{{s.provider_name}}</td><td>{{s.service_name}}</td><td>{{s.platform}}</td><td>{{s.base_rate}}</td><td>{{s.enabled}}</td></tr>{% endfor %}
+</table></div>
+{% endblock %}
