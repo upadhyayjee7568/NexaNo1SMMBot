@@ -80,6 +80,13 @@ python -m pytest -q
 - `GET /api/referrals/{telegram_id}`
 - `POST /api/rewards/daily/claim`
 - `GET /api/vip/{telegram_id}`
+
+
+## Customer Web App & Admin Dashboard
+- Customer app URL: `/app`
+- Admin dashboard URL: `/admin`
+- Web pages are server-rendered using Jinja templates.
+- Core admin/customer workflows are connected to existing backend services.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
