@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.routes import get_db
 from app.core.settings import settings
 from app.db.models import Coupon, Order, PaymentTransaction, ServiceCatalog, Ticket, User
+from app.services.auth import create_session, get_session, require_admin_access, require_csrf
 from app.services.auth import create_session, get_session, require_admin_user, require_csrf
 from app.services.growth import apply_coupon
 
@@ -54,6 +55,9 @@ def app_wallet(request: Request, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     u = _session_user(request, db)
     bal = str(wallet_balance(db, u.id))
+    from app.services.wallet import wallet_balance
+    u = _session_user(request, db)
+    bal = str(wallet_balance(db, u.id))
 def app_wallet(request: Request, telegram_id: int, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     _session(request, db)
@@ -73,12 +77,14 @@ def app_coupon_apply(request: Request, code: str = Form(...), amount: float = Fo
 @router.get('/admin')
 def admin_home(request: Request, db: Session = Depends(get_db)):
     sess = _session(request, db)
+    require_admin_access(request, db, sess)
     require_admin_user(db, sess)
     return templates.TemplateResponse('admin.html', {'request': request, 'result': None})
 
 
 @router.get('/admin/users')
 def admin_users(request: Request, db: Session = Depends(get_db)):
+    require_admin_access(request, db, _session(request, db))
     require_admin_user(db, _session(request, db))
     users = db.query(User).order_by(User.id.desc()).limit(200).all()
     return templates.TemplateResponse('admin_users.html', {'request': request, 'users': users})
@@ -86,6 +92,7 @@ def admin_users(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/admin/payments')
 def admin_payments(request: Request, db: Session = Depends(get_db)):
+    require_admin_access(request, db, _session(request, db))
     require_admin_user(db, _session(request, db))
     payments = db.query(PaymentTransaction).order_by(PaymentTransaction.id.desc()).limit(200).all()
     return templates.TemplateResponse('admin_payments.html', {'request': request, 'payments': payments})
@@ -93,6 +100,7 @@ def admin_payments(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/admin/services')
 def admin_services(request: Request, db: Session = Depends(get_db)):
+    require_admin_access(request, db, _session(request, db))
     require_admin_user(db, _session(request, db))
     services = db.query(ServiceCatalog).order_by(ServiceCatalog.id.desc()).limit(500).all()
     return templates.TemplateResponse('admin_services.html', {'request': request, 'services': services})
@@ -100,6 +108,7 @@ def admin_services(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/admin/tickets')
 def admin_tickets(request: Request, db: Session = Depends(get_db)):
+    require_admin_access(request, db, _session(request, db))
     require_admin_user(db, _session(request, db))
     tickets = db.query(Ticket).order_by(Ticket.id.desc()).limit(500).all()
     return templates.TemplateResponse('admin_tickets.html', {'request': request, 'tickets': tickets})
@@ -109,6 +118,7 @@ def admin_tickets(request: Request, db: Session = Depends(get_db)):
 def admin_coupon_create(request: Request, code: str = Form(...), discount: float = Form(...), db: Session = Depends(get_db)):
     sess = _session(request, db)
     require_csrf(request, sess)
+    require_admin_access(request, db, sess)
     require_admin_user(db, sess)
     c = Coupon(code=code.upper(), discount_percent=discount)
     db.add(c)
@@ -118,6 +128,7 @@ def admin_coupon_create(request: Request, code: str = Form(...), discount: float
 
 @router.get('/admin/reports/export/csv')
 def admin_export_csv(request: Request, kind: str = 'orders', db: Session = Depends(get_db)):
+    require_admin_access(request, db, _session(request, db))
     require_admin_user(db, _session(request, db))
     output = io.StringIO()
     writer = csv.writer(output)
