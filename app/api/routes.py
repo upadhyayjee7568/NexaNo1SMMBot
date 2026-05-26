@@ -1,5 +1,6 @@
 from decimal import Decimal
 from fastapi import APIRouter, Depends, Request, Header, HTTPException
+from fastapi import APIRouter, Depends, Request, Header
 from sqlalchemy.orm import Session
 
 from app.core.models import CreateOrderRequest
@@ -13,10 +14,39 @@ from app.services.pricing import compute_final_amount, resolve_category
 from app.services.tickets import create_ticket
 from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
 from app.services.antifraud import evaluate_order_text_risk, compute_user_risk
+from app.services.tickets import create_ticket
+from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
+from app.services.antifraud import evaluate_order_text_risk, compute_user_risk
+from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage
+from app.services.order_engine import place_order
+from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
+from app.services.tickets import create_ticket
+from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction
+from app.db.models import Order, User, WalletLedger, ServiceCatalog
+from app.services.order_engine import place_order
+from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
 from app.services.platforms import platform_catalog
 from app.services.wallet import wallet_balance, add_ledger_entry
 from app.services.finance import post_double_entry, fetch_finance_daily_report
 from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event, extract_event_id, safe_dump
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event, extract_event_id, safe_dump
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
+from app.db.models import Order, User, WalletLedger
+from app.db.session import SessionLocal
+from app.db.models import Order, User, WalletLedger
+from app.db.models import Order, User
+from app.services.order_engine import place_order
+from app.services.platforms import platform_catalog
+from app.services.wallet import wallet_balance, add_ledger_entry
+from app.services.cashfree_webhook import verify_cashfree_signature, is_success_event
+from app.services.cashfree_webhook import verify_cashfree_signature
+from fastapi import APIRouter
+
+from app.core.models import CreateOrderRequest
+from app.core.settings import settings
+from app.services.order_engine import place_order
+from app.core.settings import settings
+from app.services.platforms import platform_catalog
 
 router = APIRouter()
 
@@ -51,6 +81,7 @@ def services_platforms() -> dict:
 
 @router.post('/orders/place')
 async def orders_place(payload: CreateOrderRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.telegram_id == payload.user_id).first()
     if not user:
         user = User(telegram_id=payload.user_id)
@@ -102,6 +133,13 @@ async def orders_place(payload: CreateOrderRequest, request: Request, db: Sessio
         raise HTTPException(status_code=400, detail='Insufficient wallet balance')
 
     result = await place_order(payload.service_id, str(payload.link), payload.quantity, base_rate=float(service.base_rate), category=category)
+    balance = wallet_balance(db, user.id)
+    estimated_charge = Decimal(str(round(payload.quantity * 1.25, 2)))
+    if balance < estimated_charge:
+        raise HTTPException(status_code=400, detail='Insufficient wallet balance')
+
+    result = await place_order(payload.service_id, str(payload.link), payload.quantity, base_rate=1.0)
+    result = await place_order(payload.service_id, payload.link, payload.quantity, base_rate=1.0)
     if result.get('status') == 'created':
         order = Order(
             client_order_id=result['order_id'],
@@ -117,6 +155,14 @@ async def orders_place(payload: CreateOrderRequest, request: Request, db: Sessio
         db.add(order)
         add_ledger_entry(db, user.id, 'debit', final_amount, reference_id=result['order_id'])
         post_double_entry(db, entry_ref=f"order:{result['order_id']}", description='Order debit', debit_account='wallet_user', credit_account='revenue_hold', amount=final_amount, user_id=user.id)
+            link=payload.link,
+            quantity=payload.quantity,
+            charge_amount=Decimal(str(result['charged_amount'])),
+            status='created',
+        )
+        db.add(order)
+        add_ledger_entry(db, user.id, 'debit', Decimal(str(result['charged_amount'])), reference_id=result['order_id'])
+        post_double_entry(db, entry_ref=f"order:{result['order_id']}", description='Order debit', debit_account='wallet_user', credit_account='revenue_hold', amount=Decimal(str(result['charged_amount'])), user_id=user.id)
         db.commit()
     return result
 
@@ -147,6 +193,10 @@ def order_history(telegram_id: int, db: Session = Depends(get_db)) -> dict:
         for o in orders
     ]
     return {'telegram_id': telegram_id, 'orders': data, 'count': len(data)}
+
+
+    db.commit()
+    return result
 
 
 @router.get('/wallet/{telegram_id}')
@@ -224,6 +274,11 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
         db.commit()
         return {'ok': True, 'skipped': 'non_success_status', 'event_id': event_id}
 
+    if not is_success_event(payload.get('order_status')):
+        return {'ok': True, 'skipped': 'non_success_status'}
+
+    telegram_id = int(payload.get('customer_details', {}).get('customer_id', 0) or 0)
+    amount = Decimal(str(payload.get('order_amount', '0')))
     if telegram_id and amount > 0:
         user = db.query(User).filter(User.telegram_id == telegram_id).first()
         if not user:
@@ -232,6 +287,7 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
             db.flush()
 
         ref = f"cashfree:{event_id}"
+        ref = str(payload.get('order_id', 'cashfree'))
         exists = (
             db.query(WalletLedger)
             .filter(WalletLedger.user_id == user.id, WalletLedger.reference_id == ref, WalletLedger.entry_type == 'credit')
@@ -250,6 +306,16 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
 
     db.commit()
     return {'ok': True, 'event_id': event_id}
+
+    db.commit()
+    return {'ok': True, 'event_id': event_id}
+        if exists:
+            return {'ok': True, 'skipped': 'duplicate_webhook'}
+
+        add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
+        db.commit()
+
+    return {'ok': True}
 
 
 @router.post('/admin/users/role')
@@ -574,3 +640,40 @@ def admin_antifraud_user(
             for e in events
         ],
     }
+        add_ledger_entry(db, user.id, 'credit', amount, reference_id=str(payload.get('order_id', 'cashfree')))
+        db.commit()
+    return {'ok': True}
+@router.get("/health")
+def health() -> dict:
+    return {"status": "ok", "service": settings.app_name, "env": settings.environment}
+
+
+@router.get("/config/summary")
+def config_summary() -> dict:
+    return {
+        "project_name": settings.project_name,
+        "bot_username": settings.telegram_bot_username,
+        "support_username": settings.telegram_support_username,
+        "payment_gateway": settings.payment_gateway,
+        "cashfree_mode": settings.cashfree_mode,
+        "timezone": settings.timezone,
+    }
+
+
+@router.get("/services/platforms")
+def services_platforms() -> dict:
+    return {"platforms": platform_catalog(), "count": len(platform_catalog())}
+
+
+@router.post("/orders/place")
+async def orders_place(payload: CreateOrderRequest) -> dict:
+    # base_rate placeholder until provider service sync table is added
+    base_rate = 1.0
+    result = await place_order(
+        service_id=payload.service_id,
+        link=payload.link,
+        quantity=payload.quantity,
+        base_rate=base_rate,
+        category=None,
+    )
+    return result

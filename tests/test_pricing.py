@@ -12,3 +12,12 @@ def test_compute_final_amount_with_discounts_and_fee():
         user_bear_fee_percent=Decimal('2'),
     )
     assert amount > Decimal('0')
+from app.services.pricing import apply_markup
+
+
+def test_apply_markup_default():
+    assert apply_markup(100.0) == 125.0
+
+
+def test_apply_markup_category():
+    assert apply_markup(100.0, "youtube_views") == 130.0
