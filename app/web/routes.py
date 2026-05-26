@@ -64,6 +64,9 @@ def app_wallet(request: Request, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     u = _session_user(request, db)
     bal = str(wallet_balance(db, u.id))
+    from app.services.wallet import wallet_balance
+    u = _session_user(request, db)
+    bal = str(wallet_balance(db, u.id))
 def app_wallet(request: Request, telegram_id: int, db: Session = Depends(get_db)):
     from app.services.wallet import wallet_balance
     _session(request, db)
