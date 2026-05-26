@@ -10,6 +10,10 @@ from app.db.session import SessionLocal
 from app.db.models import Order, User, WalletLedger, ServiceCatalog, PaymentTransaction, Ticket, TicketMessage, Coupon, Referral, DailyReward
 from app.services.order_engine import place_order
 from app.services.order_lifecycle import refresh_order_status, request_refill, request_cancel
+from app.services.pricing import compute_final_amount, resolve_category
+from app.services.tickets import create_ticket
+from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
+from app.services.antifraud import evaluate_order_text_risk, compute_user_risk
 from app.services.tickets import create_ticket
 from app.services.growth import apply_coupon, register_referral, credit_daily_reward, vip_discount_percent
 from app.services.antifraud import evaluate_order_text_risk, compute_user_risk
@@ -76,6 +80,7 @@ def services_platforms() -> dict:
 
 
 @router.post('/orders/place')
+async def orders_place(payload: CreateOrderRequest, request: Request, db: Session = Depends(get_db)) -> dict:
 async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.telegram_id == payload.user_id).first()
     if not user:
@@ -87,6 +92,47 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
     if auto_block:
         raise HTTPException(status_code=403, detail='User blocked by anti-fraud policy')
 
+    service = db.query(ServiceCatalog).filter(ServiceCatalog.id == payload.service_id, ServiceCatalog.enabled == True).first()  # noqa: E712
+    if not service:
+        raise HTTPException(status_code=404, detail='Service not found')
+
+    category = resolve_category(service.platform, service.service_name)
+    vip_percent = Decimal('0')
+    coupon_percent = Decimal('0')
+    fee_percent = Decimal('2')
+
+    # VIP by spend
+    spend_rows = db.query(Order.charge_amount).filter(Order.user_id == user.id).all()
+    total_spend = sum([Decimal(str(x[0])) for x in spend_rows], Decimal('0'))
+    if total_spend >= Decimal('100000'):
+        vip_percent = Decimal('10')
+    elif total_spend >= Decimal('50000'):
+        vip_percent = Decimal('5')
+    elif total_spend >= Decimal('10000'):
+        vip_percent = Decimal('2')
+
+    coupon_code = request.headers.get('X-Coupon-Code') if request else None
+    if coupon_code:
+        c = db.query(Coupon).filter(Coupon.code == coupon_code.upper(), Coupon.active == True).first()  # noqa: E712
+        if c and (c.max_uses is None or c.used_count < c.max_uses):
+            coupon_percent = Decimal(str(c.discount_percent))
+            c.used_count += 1
+            db.flush()
+
+    final_amount = compute_final_amount(
+        base_rate=Decimal(str(service.base_rate)),
+        quantity=payload.quantity,
+        category=category,
+        vip_discount_percent=vip_percent,
+        coupon_discount_percent=coupon_percent,
+        user_bear_fee_percent=fee_percent,
+    )
+
+    balance = wallet_balance(db, user.id)
+    if balance < final_amount:
+        raise HTTPException(status_code=400, detail='Insufficient wallet balance')
+
+    result = await place_order(payload.service_id, str(payload.link), payload.quantity, base_rate=float(service.base_rate), category=category)
     balance = wallet_balance(db, user.id)
     estimated_charge = Decimal(str(round(payload.quantity * 1.25, 2)))
     if balance < estimated_charge:
@@ -102,6 +148,13 @@ async def orders_place(payload: CreateOrderRequest, db: Session = Depends(get_db
             provider_order_id=result.get('provider_order_id'),
             service_id=payload.service_id,
             link=str(payload.link),
+            quantity=payload.quantity,
+            charge_amount=final_amount,
+            status='created',
+        )
+        db.add(order)
+        add_ledger_entry(db, user.id, 'debit', final_amount, reference_id=result['order_id'])
+        post_double_entry(db, entry_ref=f"order:{result['order_id']}", description='Order debit', debit_account='wallet_user', credit_account='revenue_hold', amount=final_amount, user_id=user.id)
             link=payload.link,
             quantity=payload.quantity,
             charge_amount=Decimal(str(result['charged_amount'])),
@@ -242,6 +295,13 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
         )
         if not exists:
             add_ledger_entry(db, user.id, 'credit', amount, reference_id=ref)
+
+        # referral reward credit (5%)
+        ref = db.query(Referral).filter(Referral.referred_user_id == user.id).first()
+        if ref:
+            reward = (amount * Decimal(str(ref.reward_percent)) / Decimal('100')).quantize(Decimal('0.01'))
+            add_ledger_entry(db, ref.referrer_user_id, 'credit', reward, reference_id=f'referral:{event_id}', note='Referral reward')
+
             post_double_entry(db, entry_ref=f"cashfree:{event_id}", description='Wallet topup via Cashfree', debit_account='cashfree_clearing', credit_account='wallet_user', amount=amount, user_id=user.id)
 
     db.commit()

@@ -100,6 +100,13 @@ python -m pytest -q
 - CSRF validation for mutable web actions.
 - Admin web routes now require authenticated session + role checks.
 - Login URL: `/web/login`
+
+
+## Phase C (Telegram UX) Completed
+- `/menu` interactive flow with Place Order / Wallet / Ticket / Daily Reward / Referral.
+- Multi-step order capture conversation.
+- Ticket create conversation from bot.
+- Daily reward + referral command support in bot runtime.
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
