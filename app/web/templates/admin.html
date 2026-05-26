@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card"><h2>Admin Dashboard</h2>
+<p>Manage users, orders, tickets, services, and finance reports.</p></div>
+
+<div class="card">
+<h3>Finance Daily Report</h3>
+<form method="get" action="/admin/finance" >
+  <input name="admin_tg" placeholder="Admin Telegram ID (X-Telegram-Id)" required>
+  <button>Load Report</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Create Coupon</h3>
+<form method="post" action="/admin/coupons/create">
+  <input name="admin_tg" placeholder="Admin Telegram ID" required>
+  <input name="code" placeholder="CODE" required>
+  <input name="discount" placeholder="Discount %" required>
+  <button>Create</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Orders</h3>
+<form method="get" action="/admin/orders/view">
+  <input name="admin_tg" placeholder="Admin Telegram ID" required>
+  <button>Load Orders</button>
+</form>
+</div>
+{% if result %}<div class="card"><pre>{{ result }}</pre></div>{% endif %}
+{% endblock %}
