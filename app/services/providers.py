@@ -30,6 +30,9 @@ class ProviderClient:
 
     async def create_order(self, service: int, link: str, quantity: int) -> dict[str, Any]:
         result = await self._request({"key": self.api_key, "action": "add", "service": service, "link": link, "quantity": quantity})
+
+    async def create_order(self, service: int, link: str, quantity: int) -> dict[str, Any]:
+        result = await self._request({"key": self.api_key, "action": "add", "service": service, "link": link, "quantity": quantity})
         async with httpx.AsyncClient(timeout=20) as client:
             r = await client.post(self.base_url, data=payload)
             r.raise_for_status()

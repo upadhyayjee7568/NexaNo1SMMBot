@@ -34,6 +34,21 @@ python -m pytest -q
 ```
 
 
+## Deployment Readiness (Task D)
+1. Validate env and placeholders:
+   ```bash
+   ./scripts/preflight_check.sh .env.production
+   ```
+2. Run production deployment with migrations + health checks:
+   ```bash
+   ./scripts/deploy.sh
+   ```
+3. Verify runtime:
+   ```bash
+   ./scripts/check_health.sh http://127.0.0.1:8000
+   ```
+
+
 ## Ops Scripts
 - `scripts/run_migrations.sh` — apply DB migrations.
 - `scripts/run_api.sh` — start API service.
