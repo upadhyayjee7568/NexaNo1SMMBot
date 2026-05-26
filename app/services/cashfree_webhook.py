@@ -1,11 +1,8 @@
 import hashlib
 import hmac
 import json
+
 from fastapi import HTTPException
-import hmac
-import hashlib
-from fastapi import HTTPException
-from fastapi import Header, HTTPException
 
 from app.core.settings import settings
 
@@ -17,17 +14,6 @@ def verify_cashfree_signature(raw_body: bytes, signature: str | None) -> None:
         raise HTTPException(status_code=401, detail="Missing signature")
 
     digest = hmac.new(settings.cashfree_webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
-
-    if not signature:
-        raise HTTPException(status_code=401, detail="Missing signature")
-
-    if not signature:
-        raise HTTPException(status_code=401, detail="Missing signature")
-    digest = hmac.new(
-        settings.cashfree_webhook_secret.encode(),
-        raw_body,
-        hashlib.sha256,
-    ).hexdigest()
     if not hmac.compare_digest(digest, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
@@ -46,6 +32,3 @@ def extract_event_id(payload: dict) -> str:
 
 def safe_dump(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    if not order_status:
-        return False
-    return order_status.upper() in {"PAID", "SUCCESS"}
