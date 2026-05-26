@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -34,11 +35,6 @@ def add_ledger_entry(
         user_id=user_id,
         entry_type=entry_type,
         amount=_normalized_amount(entry_type, amount),
-def add_ledger_entry(session: Session, user_id: int, entry_type: str, amount: Decimal, reference_id: str | None = None, note: str | None = None) -> WalletLedger:
-    entry = WalletLedger(
-        user_id=user_id,
-        entry_type=entry_type,
-        amount=amount,
         reference_id=reference_id,
         note=note,
     )
