@@ -24,6 +24,5 @@ def platform_catalog() -> list[dict]:
             "status": "launch_ready",
             "supports": ["followers", "likes", "views", "comments", "members"],
         }
-        {"platform": p, "enabled": True, "status": "launch_ready"}
         for p in SUPPORTED_PLATFORMS
     ]
