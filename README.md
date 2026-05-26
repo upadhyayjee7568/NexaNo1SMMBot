@@ -93,6 +93,13 @@ python -m pytest -q
 - Auto risk scoring on order placement (blocked words + rate limit).
 - Auto-ban when cumulative risk threshold is reached.
 - `GET /api/admin/antifraud/user/{telegram_id}` (support+) for fraud audit view.
+
+
+## Phase A Security (Completed)
+- Web session auth added (`web_sessions` table + signed random session token).
+- CSRF validation for mutable web actions.
+- Admin web routes now require authenticated session + role checks.
+- Login URL: `/web/login`
 3. Run deployment:
    ```bash
    ./scripts/deploy.sh
