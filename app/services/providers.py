@@ -5,6 +5,8 @@ from typing import Any
 
 import httpx
 
+from app.core.settings import settings
+
 
 @dataclass
 class ProviderClient:
@@ -13,6 +15,21 @@ class ProviderClient:
     api_key: str
 
     async def _request(self, payload: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
+        try:
+            async with httpx.AsyncClient(timeout=settings.provider_timeout_seconds) as client:
+                r = await client.post(self.base_url, data=payload)
+                r.raise_for_status()
+                body = r.json()
+                if isinstance(body, (dict, list)):
+                    return body
+                return {"status": "error", "message": "invalid_provider_payload", "raw": str(body)}
+        except httpx.TimeoutException:
+            return {"status": "error", "message": "provider_timeout"}
+        except httpx.HTTPError as exc:
+            return {"status": "error", "message": "provider_http_error", "raw": str(exc)}
+
+    async def create_order(self, service: int, link: str, quantity: int) -> dict[str, Any]:
+        result = await self._request({"key": self.api_key, "action": "add", "service": service, "link": link, "quantity": quantity})
         async with httpx.AsyncClient(timeout=20) as client:
             r = await client.post(self.base_url, data=payload)
             r.raise_for_status()

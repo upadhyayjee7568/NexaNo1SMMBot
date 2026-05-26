@@ -20,10 +20,7 @@ class Settings(BaseSettings):
     payment_gateway: str = Field(default="cashfree", alias="PAYMENT_GATEWAY")
     cashfree_mode: str = Field(default="LIVE", alias="CASHFREE_MODE")
     cashfree_webhook_secret: str = Field(default="", alias="CASHFREE_WEBHOOK_SECRET")
-    telegram_support_username: str = Field(default="NexaNo1Support", alias="TELEGRAM_SUPPORT_USERNAME")
-
-    payment_gateway: str = Field(default="cashfree", alias="PAYMENT_GATEWAY")
-    cashfree_mode: str = Field(default="LIVE", alias="CASHFREE_MODE")
+    min_add_money_inr: int = Field(default=100, alias="MIN_ADD_MONEY_INR")
 
     database_url: str = Field(default="postgresql://nexa:nexa_change_me@postgres:5432/nexa_smm", alias="DATABASE_URL")
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
@@ -32,11 +29,9 @@ class Settings(BaseSettings):
     provider_1_api_key: str = Field(default="", alias="PROVIDER_1_API_KEY")
     provider_2_base_url: str = Field(default="https://peakerr.com/api/v2", alias="PROVIDER_2_BASE_URL")
     provider_2_api_key: str = Field(default="", alias="PROVIDER_2_API_KEY")
-
+    provider_timeout_seconds: int = Field(default=20, alias="PROVIDER_TIMEOUT_SECONDS")
 
     web_session_cookie_name: str = Field(default="nexa_session", alias="WEB_SESSION_COOKIE_NAME")
-
-    cashfree_webhook_secret: str = Field(default="", alias="CASHFREE_WEBHOOK_SECRET")
 
 
 settings = Settings()

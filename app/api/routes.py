@@ -115,6 +115,8 @@ def get_wallet(telegram_id: int, db: Session = Depends(get_db)) -> dict:
 
 @router.post('/payments/cashfree/webhook')
 async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = Header(default=None), db: Session = Depends(get_db)) -> dict:
+    if settings.payment_gateway.lower() != 'cashfree':
+        raise HTTPException(status_code=400, detail='Cashfree gateway is disabled')
     raw = await request.body()
     verify_cashfree_signature(raw, x_cashfree_signature)
     payload = await request.json()
@@ -125,6 +127,9 @@ async def cashfree_webhook(request: Request, x_cashfree_signature: str | None = 
 
     telegram_id = int(payload.get('customer_details', {}).get('customer_id', 0) or 0)
     amount = Decimal(str(payload.get('order_amount', '0')))
+    if amount < Decimal(str(settings.min_add_money_inr)):
+        db.commit()
+        return {'ok': True, 'skipped': 'below_min_add_money', 'event_id': event_id}
     db.add(PaymentTransaction(gateway='cashfree', gateway_event_id=event_id, order_id=str(payload.get('order_id', '')) or None, telegram_id=telegram_id or None, amount=amount, currency='INR', status=str(payload.get('order_status', 'received')).lower(), raw_payload=safe_dump(payload)))
 
     if is_success_event(payload.get('order_status')) and telegram_id and amount > 0:
