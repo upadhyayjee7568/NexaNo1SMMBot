@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Numeric, Text, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,6 +19,10 @@ class User(Base):
 class PaymentTransaction(Base):
     __tablename__ = "payment_transactions"
     __table_args__ = (UniqueConstraint("gateway", "gateway_event_id", name="uq_gateway_event"),)
+    __table_args__ = (
+        UniqueConstraint("gateway", "gateway_event_id", name="uq_gateway_event"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     gateway: Mapped[str] = mapped_column(String(32), index=True)
     gateway_event_id: Mapped[str] = mapped_column(String(128), index=True)
@@ -27,12 +32,19 @@ class PaymentTransaction(Base):
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     status: Mapped[str] = mapped_column(String(32), default="received")
     raw_payload: Mapped[str] = mapped_column(Text)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    telegram_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    role: Mapped[str] = mapped_column(String(24), default="user")  # user/support/admin/superadmin
+    is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class ServiceCatalog(Base):
     __tablename__ = "service_catalog"
     __table_args__ = (UniqueConstraint("provider_name", "provider_service_id", name="uq_provider_service"),)
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider_name: Mapped[str] = mapped_column(String(64), index=True)
     provider_service_id: Mapped[str] = mapped_column(String(64), index=True)
@@ -52,6 +64,13 @@ class WalletLedger(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     entry_type: Mapped[str] = mapped_column(String(32))
+class WalletLedger(Base):
+    __tablename__ = "wallet_ledger"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    entry_type: Mapped[str] = mapped_column(String(32))
+    entry_type: Mapped[str] = mapped_column(String(32))  # credit/debit/refund/adjustment
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(8), default="INR")
     reference_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -83,6 +102,12 @@ class JournalLine(Base):
 
 class Order(Base):
     __tablename__ = "orders"
+    user = relationship("User")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     client_order_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
@@ -146,3 +171,4 @@ class DailyReward(Base):
     reward_date: Mapped[datetime] = mapped_column(DateTime)
     amount: Mapped[float] = mapped_column(Numeric(12, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user = relationship("User")
