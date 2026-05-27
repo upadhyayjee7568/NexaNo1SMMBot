@@ -23,9 +23,10 @@ def resolve_category(platform: str, service_name: str) -> str | None:
     return None
 
 
-def apply_markup(base_rate: Decimal, category: str | None = None) -> Decimal:
+def apply_markup(base_rate: Decimal | float, category: str | None = None) -> Decimal:
+    base = Decimal(str(base_rate))
     markup = CATEGORY_MARKUP.get(category or "", DEFAULT_MARKUP)
-    return (base_rate * (Decimal("1") + markup / Decimal("100"))).quantize(Decimal("0.0001"))
+    return (base * (Decimal("1") + markup / Decimal("100"))).quantize(Decimal("0.0001"))
 
 
 def compute_final_amount(
@@ -39,19 +40,7 @@ def compute_final_amount(
     unit = apply_markup(base_rate, category)
     gross = unit * Decimal(quantity)
     discount_pct = vip_discount_percent + coupon_discount_percent
-    discount_amt = (gross * discount_pct / Decimal('100'))
+    discount_amt = gross * discount_pct / Decimal('100')
     net = gross - discount_amt
     fee = net * user_bear_fee_percent / Decimal('100')
     return (net + fee).quantize(Decimal('0.01'))
-CATEGORY_MARKUP = {
-    "instagram_followers": 20,
-    "instagram_likes": 25,
-    "youtube_views": 30,
-    "telegram_members": 20,
-}
-DEFAULT_MARKUP = 25
-
-
-def apply_markup(base_rate: float, category: str | None = None) -> float:
-    markup = CATEGORY_MARKUP.get(category or "", DEFAULT_MARKUP)
-    return round(base_rate * (1 + markup / 100), 4)
