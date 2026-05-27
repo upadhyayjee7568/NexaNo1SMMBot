@@ -159,3 +159,18 @@ Configuration baseline for **Nexa Media Solution / Nexa SMM Panel**.
 ## Files
 - `PROJECT_SETUP.md` — business + product requirements snapshot.
 - `config.nexa.example.yaml` — implementation-ready config template (replace placeholder secrets before production use).
+
+
+## Bot Deploy via GitHub CLI
+1. Create a Render **Background Worker** for bot command `python -m app.bot.runtime`.
+2. In GitHub repo secrets, add: `RENDER_BOT_DEPLOY_HOOK_URL` (Render deploy hook URL of bot worker).
+3. Trigger deploy from GitHub CLI:
+   ```bash
+   gh workflow run "Deploy Telegram Bot" -f environment=production
+   ```
+4. Check status/logs:
+   ```bash
+   gh run list --workflow "Deploy Telegram Bot"
+   gh run view --log
+   ```
+
