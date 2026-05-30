@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from typing import Literal
 
 
@@ -24,7 +24,6 @@ class CreateOrderRequest(BaseModel):
     platform: str
     service_id: int
     quantity: int = Field(gt=0)
-    link: HttpUrl
     link: str
 
 

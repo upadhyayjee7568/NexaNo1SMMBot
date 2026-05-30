@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.core.models import CreateOrderRequest
 from app.core.rbac import get_actor, require_role
 from app.core.settings import settings
-from app.db.models import Coupon, Order, PaymentTransaction, Referral, ServiceCatalog, User, WalletLedger
+from app.db.models import Coupon, Order, PaymentTransaction, Referral, ServiceCatalog, UpiTopup, User, WalletLedger
 from app.db.session import SessionLocal
+from app.services import cashfree as cashfree_svc
+from app.services import upi_fallback
 from app.services.cashfree_webhook import extract_event_id, is_success_event, safe_dump, verify_cashfree_signature
 from app.services.finance import fetch_finance_daily_report, post_double_entry
 from app.services.growth import apply_coupon, credit_daily_reward, register_referral, vip_discount_percent
@@ -105,12 +107,128 @@ async def orders_place(payload: CreateOrderRequest, request: Request, db: Sessio
     return result
 
 
+@router.post('/telegram/webhook')
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> dict:
+    # Telegram echoes the secret token configured via setWebhook; reject anything else.
+    if settings.telegram_webhook_secret and x_telegram_bot_api_secret_token != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=403, detail='Invalid webhook secret')
+    update = await request.json()
+    from app.bot.webhook import handle_update
+
+    try:
+        await handle_update(update, db)
+    except Exception:  # noqa: BLE001
+        # Always return 200 so Telegram does not spam-retry a poison update.
+        import logging
+
+        logging.getLogger('nexa.bot').exception('Failed to handle update')
+    return {'ok': True}
+
+
+@router.post('/telegram/set-webhook')
+async def telegram_set_webhook(request: Request) -> dict:
+    """Admin helper to register the Telegram webhook. Guarded by the webhook secret."""
+    body = await request.json()
+    if not settings.telegram_webhook_secret or body.get('secret') != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=403, detail='Invalid secret')
+    if not settings.public_base_url:
+        raise HTTPException(status_code=400, detail='PUBLIC_BASE_URL not configured')
+    import httpx
+
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/setWebhook"
+    webhook_url = f"{settings.public_base_url.rstrip('/')}/api/telegram/webhook"
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            url,
+            json={
+                'url': webhook_url,
+                'secret_token': settings.telegram_webhook_secret,
+                'allowed_updates': ['message', 'edited_message', 'callback_query'],
+                'drop_pending_updates': True,
+            },
+        )
+    return {'webhook_url': webhook_url, 'telegram_response': resp.json()}
+
+
 @router.get('/wallet/{telegram_id}')
 def get_wallet(telegram_id: int, db: Session = Depends(get_db)) -> dict:
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not user:
         return {'telegram_id': telegram_id, 'balance': '0.00', 'currency': 'INR'}
     return {'telegram_id': telegram_id, 'balance': str(wallet_balance(db, user.id)), 'currency': 'INR'}
+
+
+@router.post('/payments/add-money/initiate')
+async def add_money_initiate(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Start a wallet top-up. Tries Cashfree first; on any failure falls back to UPI QR."""
+    body = await request.json()
+    telegram_id = int(body.get('telegram_id') or 0)
+    amount = Decimal(str(body.get('amount') or 0))
+    phone = body.get('phone')
+    if telegram_id <= 0:
+        raise HTTPException(status_code=400, detail='telegram_id required')
+    if amount < Decimal(str(settings.min_add_money_inr)):
+        raise HTTPException(status_code=400, detail=f'Minimum add money is INR {settings.min_add_money_inr}')
+    if amount > Decimal(str(settings.max_add_money_inr)):
+        raise HTTPException(status_code=400, detail=f'Maximum add money is INR {settings.max_add_money_inr}')
+
+    # 1) Try Cashfree
+    if cashfree_svc.is_configured():
+        try:
+            link = await cashfree_svc.create_payment_link(telegram_id, amount, phone=phone)
+            return {'method': 'cashfree', 'amount': str(amount), **link}
+        except cashfree_svc.CashfreeError:
+            pass  # fall through to UPI
+
+    # 2) UPI fallback
+    if not settings.upi_fallback_enabled or not settings.admin_upi_id:
+        raise HTTPException(status_code=503, detail='No payment method available right now')
+    try:
+        topup, uri, qr = upi_fallback.create_upi_topup(db, telegram_id, amount)
+    except upi_fallback.UpiError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {
+        'method': 'upi',
+        'amount': str(amount),
+        'reference': topup.reference,
+        'upi_id': topup.upi_id,
+        'upi_uri': uri,
+        'qr_data_uri': qr,
+        'note': 'Pay using any UPI app, then submit your 12-digit UTR/reference number to credit your wallet.',
+    }
+
+
+@router.post('/payments/upi/submit-utr')
+async def upi_submit_utr(request: Request, db: Session = Depends(get_db)) -> dict:
+    body = await request.json()
+    reference = str(body.get('reference') or '').strip()
+    utr = str(body.get('utr') or '').strip()
+    if not reference:
+        raise HTTPException(status_code=400, detail='reference required')
+    try:
+        topup, status = upi_fallback.submit_utr(db, reference, utr)
+    except upi_fallback.UpiError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if status == 'not_found':
+        raise HTTPException(status_code=404, detail='Top-up reference not found')
+    return {
+        'ok': status in {'credited', 'pending_review'},
+        'status': status,
+        'reference': reference,
+        'amount': str(topup.amount) if topup else None,
+    }
+
+
+@router.get('/payments/upi/{reference}')
+def upi_status(reference: str, db: Session = Depends(get_db)) -> dict:
+    topup = db.query(UpiTopup).filter(UpiTopup.reference == reference).first()
+    if not topup:
+        raise HTTPException(status_code=404, detail='Not found')
+    return {'reference': reference, 'status': topup.status, 'amount': str(topup.amount), 'utr': topup.utr}
 
 
 @router.post('/payments/cashfree/webhook')
