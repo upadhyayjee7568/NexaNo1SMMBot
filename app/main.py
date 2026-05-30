@@ -1,5 +1,4 @@
 import logging
-import asyncio
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -7,7 +6,6 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app.api.routes import router
 from app.core.settings import settings
 from app.web.routes import router as web_router
-from app.services.health_monitor import start_health_monitoring
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,13 +24,7 @@ def _startup() -> None:
 
         init_db()
         _DB_READY["done"] = True
-        
-        # Start health monitoring
-        logging.info("[STARTUP] Starting health monitoring system...")
-        try:
-            asyncio.create_task(start_health_monitoring())
-        except Exception as e:
-            logging.error(f"[STARTUP] Failed to start health monitoring: {e}")
+        logging.info("[STARTUP] Database initialized successfully")
             
     except Exception:  # noqa: BLE001
         logging.getLogger("nexa").exception("init_db failed at startup")
