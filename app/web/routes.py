@@ -19,15 +19,32 @@ templates = Jinja2Templates(directory="app/web/templates")
 
 
 def _session(request: Request, db: Session):
-    return get_session(db, request.cookies.get(settings.web_session_cookie_name))
+    try:
+        return get_session(db, request.cookies.get(settings.web_session_cookie_name))
+    except HTTPException:
+        # No valid session - return None to redirect
+        return None
 
 
-def _session_user(request: Request, db: Session) -> User:
+def _session_user(request: Request, db: Session) -> User | None:
     sess = _session(request, db)
+    if not sess:
+        return None
     user = db.query(User).filter(User.id == sess.user_id).first()
     if not user:
-        raise HTTPException(status_code=401, detail="Session user missing")
+        return None
     return user
+
+
+def _require_admin_or_redirect(request: Request, db: Session) -> User | None:
+    """Check admin access and redirect to login if needed."""
+    sess = _session(request, db)
+    if not sess:
+        return None
+    try:
+        return require_admin_access(request, db, sess)
+    except HTTPException:
+        return None
 
 
 @router.get("/web/login")
@@ -54,6 +71,8 @@ def web_login(request: Request, telegram_id: int = Form(...), db: Session = Depe
 @router.get("/app")
 def customer_home(request: Request, db: Session = Depends(get_db)):
     user = _session_user(request, db)
+    if not user:
+        return RedirectResponse(url="/web/login", status_code=302)
     bal = str(wallet_balance(db, user.id))
     orders = db.query(Order).filter(Order.user_id == user.id).order_by(Order.id.desc()).limit(20).all()
     return templates.TemplateResponse(
@@ -72,6 +91,8 @@ def customer_home(request: Request, db: Session = Depends(get_db)):
 @router.get("/app/wallet")
 def app_wallet(request: Request, db: Session = Depends(get_db)):
     user = _session_user(request, db)
+    if not user:
+        return RedirectResponse(url="/web/login", status_code=302)
     bal = str(wallet_balance(db, user.id))
     return templates.TemplateResponse(
         "customer.html",
@@ -81,7 +102,12 @@ def app_wallet(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/app/coupon/apply")
 def app_coupon_apply(request: Request, code: str = Form(...), amount: float = Form(...), db: Session = Depends(get_db)):
+    user = _session_user(request, db)
+    if not user:
+        return RedirectResponse(url="/web/login", status_code=302)
     sess = _session(request, db)
+    if not sess:
+        return RedirectResponse(url="/web/login", status_code=302)
     require_csrf(request, sess)
     final, status = apply_coupon(db, code=code, amount=amount)
     return templates.TemplateResponse("customer.html", {"request": request, "result": f"{status}: final={final}"})
@@ -89,8 +115,8 @@ def app_coupon_apply(request: Request, code: str = Form(...), amount: float = Fo
 
 @router.get("/admin")
 def admin_home(request: Request, db: Session = Depends(get_db)):
-    sess = _session(request, db)
-    require_admin_access(request, db, sess)
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     users_count = db.query(User).count()
     orders_count = db.query(Order).count()
     payments_count = db.query(PaymentTransaction).count()
@@ -112,14 +138,16 @@ def admin_home(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/admin/users")
 def admin_users(request: Request, db: Session = Depends(get_db)):
-    require_admin_access(request, db, _session(request, db))
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     users = db.query(User).order_by(User.id.desc()).limit(200).all()
     return templates.TemplateResponse("admin_users.html", {"request": request, "users": users})
 
 
 @router.get("/admin/payments")
 def admin_payments(request: Request, db: Session = Depends(get_db)):
-    require_admin_access(request, db, _session(request, db))
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     payments = db.query(PaymentTransaction).order_by(PaymentTransaction.id.desc()).limit(200).all()
     upi = db.query(UpiTopup).order_by(UpiTopup.id.desc()).limit(200).all()
     return templates.TemplateResponse(
@@ -129,9 +157,10 @@ def admin_payments(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/admin/upi/{topup_id}/approve")
 def admin_upi_approve(request: Request, topup_id: int, db: Session = Depends(get_db)):
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     sess = _session(request, db)
     require_csrf(request, sess)
-    require_admin_access(request, db, sess)
     from app.services.upi_fallback import credit_upi_topup
 
     topup = db.query(UpiTopup).filter(UpiTopup.id == topup_id).first()
@@ -144,9 +173,10 @@ def admin_upi_approve(request: Request, topup_id: int, db: Session = Depends(get
 
 @router.post("/admin/upi/{topup_id}/reject")
 def admin_upi_reject(request: Request, topup_id: int, db: Session = Depends(get_db)):
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     sess = _session(request, db)
     require_csrf(request, sess)
-    require_admin_access(request, db, sess)
     topup = db.query(UpiTopup).filter(UpiTopup.id == topup_id).first()
     if not topup:
         raise HTTPException(status_code=404, detail="Top-up not found")
@@ -158,23 +188,26 @@ def admin_upi_reject(request: Request, topup_id: int, db: Session = Depends(get_
 
 @router.get("/admin/services")
 def admin_services(request: Request, db: Session = Depends(get_db)):
-    require_admin_access(request, db, _session(request, db))
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     services = db.query(ServiceCatalog).order_by(ServiceCatalog.id.desc()).limit(500).all()
     return templates.TemplateResponse("admin_services.html", {"request": request, "services": services})
 
 
 @router.get("/admin/tickets")
 def admin_tickets(request: Request, db: Session = Depends(get_db)):
-    require_admin_access(request, db, _session(request, db))
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     tickets = db.query(Ticket).order_by(Ticket.id.desc()).limit(500).all()
     return templates.TemplateResponse("admin_tickets.html", {"request": request, "tickets": tickets})
 
 
 @router.post("/admin/coupons/create")
 def admin_coupon_create(request: Request, code: str = Form(...), discount: float = Form(...), db: Session = Depends(get_db)):
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     sess = _session(request, db)
     require_csrf(request, sess)
-    require_admin_access(request, db, sess)
     c = Coupon(code=code.upper(), discount_percent=discount)
     db.add(c)
     db.commit()
@@ -183,7 +216,8 @@ def admin_coupon_create(request: Request, code: str = Form(...), discount: float
 
 @router.get("/admin/reports/export/csv")
 def admin_export_csv(request: Request, kind: str = "orders", db: Session = Depends(get_db)):
-    require_admin_access(request, db, _session(request, db))
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     output = io.StringIO()
     writer = csv.writer(output)
     if kind == "orders":
@@ -204,8 +238,8 @@ def admin_export_csv(request: Request, kind: str = "orders", db: Session = Depen
 @router.get("/health/dashboard")
 def health_dashboard(request: Request, db: Session = Depends(get_db)):
     """Display system health status dashboard for admins."""
-    sess = _session(request, db)
-    require_admin_access(request, db, sess)
+    if not _require_admin_or_redirect(request, db):
+        return RedirectResponse(url="/web/login", status_code=302)
     
     health_status = get_health_status()
     
