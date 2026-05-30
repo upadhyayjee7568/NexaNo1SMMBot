@@ -30,8 +30,6 @@ async def place_order(service_id: int, link: str, quantity: int, base_rate: floa
         if not provider.api_key:
             provider_errors.append({"provider": provider.name, "error": "missing_api_key"})
             continue
-
-    for provider in _provider_clients():
         try:
             result = await provider.create_order(service=service_id, link=link, quantity=quantity)
             if result.get("order"):
