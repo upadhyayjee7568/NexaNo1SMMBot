@@ -30,5 +30,30 @@ def init_db() -> None:
     # Import models so they register on Base.metadata before create_all.
     from app.db import models  # noqa: F401
     from app.db.base import Base
+    from app.core.settings import settings
 
     Base.metadata.create_all(bind=engine)
+    
+    # Create default admin user if ADMIN_TELEGRAM_ID is set and user doesn't exist
+    if settings.admin_telegram_id:
+        db = SessionLocal()
+        try:
+            existing = db.query(models.User).filter(
+                models.User.telegram_id == settings.admin_telegram_id
+            ).first()
+            if not existing:
+                admin_user = models.User(
+                    telegram_id=settings.admin_telegram_id,
+                    role="admin",
+                    is_banned=False
+                )
+                db.add(admin_user)
+                db.commit()
+                import logging
+                logging.info(f"[SEED] Created admin user with telegram_id={settings.admin_telegram_id}")
+        except Exception as e:
+            import logging
+            logging.error(f"[SEED] Failed to create admin user: {e}")
+            db.rollback()
+        finally:
+            db.close()
