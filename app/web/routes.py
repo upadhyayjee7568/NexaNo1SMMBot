@@ -12,6 +12,7 @@ from app.db.models import Coupon, Order, PaymentTransaction, ServiceCatalog, Tic
 from app.services.auth import create_session, get_session, require_admin_access, require_csrf
 from app.services.growth import apply_coupon
 from app.services.health_monitor import get_health_status
+from app.services.wallet import wallet_balance
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
@@ -36,11 +37,18 @@ def web_login_page(request: Request):
 
 @router.post("/web/login")
 def web_login(request: Request, telegram_id: int = Form(...), db: Session = Depends(get_db)):
-    sess = create_session(db, telegram_id=telegram_id)
-    resp = RedirectResponse(url="/app", status_code=302)
-    resp.set_cookie(settings.web_session_cookie_name, sess.session_token, httponly=True, samesite="lax")
-    resp.set_cookie("csrf_token", sess.csrf_token, httponly=False, samesite="lax")
-    return resp
+    try:
+        sess = create_session(db, telegram_id=telegram_id)
+        resp = RedirectResponse(url="/app", status_code=302)
+        resp.set_cookie(settings.web_session_cookie_name, sess.session_token, httponly=True, samesite="lax")
+        resp.set_cookie("csrf_token", sess.csrf_token, httponly=False, samesite="lax")
+        return resp
+    except HTTPException as e:
+        # User not found or other error - show login page with error
+        return templates.TemplateResponse(
+            "login.html", 
+            {"request": request, "result": None, "error": e.detail}
+        )
 
 
 @router.get("/app")
