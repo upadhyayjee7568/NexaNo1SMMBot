@@ -4,10 +4,10 @@ Used automatically when the Cashfree gateway is disabled or unavailable. A UPI
 ``upi://pay`` deep link + QR code is generated for the admin UPI ID, the user pays
 from any UPI app, then submits the bank UTR/reference number.
 
-Fraud mitigation (since there is no bank API to confirm receipt):
+Flow (admin-verified):
   * The UTR column is UNIQUE -> the same reference can never be reused.
-  * Amounts at or below ``UPI_AUTO_CREDIT_MAX_INR`` are auto-credited on UTR submit.
-  * Larger amounts are held as ``pending`` for manual admin approval.
+  * When the user submits a UTR the top-up moves to ``pending_review``.
+  * An admin approves (credits the wallet) or rejects it from the admin panel / bot.
   * Every credit is written to the double-entry journal so it can be audited / reversed.
 """
 
@@ -153,10 +153,10 @@ def credit_upi_topup(db: Session, topup: UpiTopup, by: str = "system") -> str:
 
 
 def submit_utr(db: Session, reference: str, utr: str) -> tuple[UpiTopup, str]:
-    """Attach a UTR to a top-up and auto-credit when within the configured cap.
+    """Attach a UTR to a top-up and hold it for manual admin approval.
 
     Returns (topup, status) where status is one of:
-      credited | pending_review | duplicate_utr | not_found | already_done
+      pending_review | duplicate_utr | not_found | already_done
     """
     utr = (utr or "").strip()
     if not utr or len(utr) < 6:
@@ -174,18 +174,48 @@ def submit_utr(db: Session, reference: str, utr: str) -> tuple[UpiTopup, str]:
         return topup, "duplicate_utr"
 
     topup.utr = utr
+    topup.status = "pending_review"
     try:
         db.flush()
     except IntegrityError:
         db.rollback()
         return topup, "duplicate_utr"
 
-    cap = Decimal(str(settings.upi_auto_credit_max_inr))
-    if Decimal(str(topup.amount)) <= cap:
-        credit_upi_topup(db, topup, by="auto")
-        db.commit()
-        return topup, "credited"
-
-    # Above the auto-credit cap -> hold for manual admin review.
     db.commit()
     return topup, "pending_review"
+
+
+def approve_topup(db: Session, reference: str, by: str = "admin") -> tuple[UpiTopup | None, str]:
+    """Admin approves a pending UPI top-up and credits the wallet."""
+    topup = db.query(UpiTopup).filter(UpiTopup.reference == reference).first()
+    if not topup:
+        return None, "not_found"
+    if topup.status == "credited":
+        return topup, "already_credited"
+    if not topup.utr:
+        return topup, "no_utr"
+    status = credit_upi_topup(db, topup, by=by)
+    db.commit()
+    return topup, status
+
+
+def reject_topup(db: Session, reference: str, by: str = "admin") -> tuple[UpiTopup | None, str]:
+    """Admin rejects a UPI top-up. No wallet credit is made."""
+    topup = db.query(UpiTopup).filter(UpiTopup.reference == reference).first()
+    if not topup:
+        return None, "not_found"
+    if topup.status == "credited":
+        return topup, "already_credited"
+    topup.status = "rejected"
+    db.commit()
+    return topup, "rejected"
+
+
+def list_pending(db: Session, limit: int = 50) -> list[UpiTopup]:
+    return (
+        db.query(UpiTopup)
+        .filter(UpiTopup.status == "pending_review")
+        .order_by(UpiTopup.id.desc())
+        .limit(limit)
+        .all()
+    )
