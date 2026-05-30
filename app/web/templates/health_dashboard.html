@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin">📊 Dashboard</a></li>
+      <li><a href="/admin/users">👥 Users</a></li>
+      <li><a href="/admin/payments">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services">🛍️ Services</a></li>
+      <li><a href="/admin/tickets">🎟️ Tickets</a></li>
+      <li><a href="/health/dashboard" class="active">🏥 System Health</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-content">
+    <div class="breadcrumb">
+      <a href="/admin">📊 Admin</a> / <span>🏥 System Health</span>
+    </div>
+
+    <div class="card">
+      <h1 class="card-title">System Health Monitor</h1>
+      <p class="card-subtitle">Real-time monitoring of all system components and services</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Overall Status</div>
+        <div class="stat-value" style="color: 
+          {% if health.overall_status == 'healthy' %}
+            var(--success)
+          {% elif health.overall_status == 'degraded' %}
+            var(--warning)
+          {% else %}
+            var(--danger)
+          {% endif %}
+        ;">
+          {% if health.overall_status == 'healthy' %}
+            ✓ Healthy
+          {% elif health.overall_status == 'degraded' %}
+            ⚠ Degraded
+          {% else %}
+            ✗ Critical
+          {% endif %}
+        </div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Last Check</div>
+        <div class="stat-value" style="font-size: 0.9rem; color: var(--text-muted);">
+          {{ health.timestamp[:19] }}
+        </div>
+      </div>
+    </div>
+
+    {% for component, status in health.components.items() %}
+      <div class="card">
+        <h2 class="card-title">
+          {% if component == 'database' %}
+            🗄️ Database
+          {% elif component == 'bot' %}
+            🤖 Telegram Bot
+          {% elif component == 'api' %}
+            🔵 Main API
+          {% elif component == 'payment_providers' %}
+            💳 Payment Providers
+          {% else %}
+            📦 {{ component }}
+          {% endif %}
+        </h2>
+        
+        {% if component == 'payment_providers' %}
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for provider_name, provider_status in status.items() %}
+                <tr>
+                  <td><strong>{{ provider_name }}</strong></td>
+                  <td>
+                    {% if provider_status.status == 'healthy' %}
+                      <span class="badge badge-success">✓ Healthy</span>
+                    {% elif provider_status.status == 'unconfigured' %}
+                      <span class="badge badge-primary">⚙️ Not Configured</span>
+                    {% elif provider_status.status == 'degraded' %}
+                      <span class="badge badge-warning">⚠ Degraded</span>
+                    {% else %}
+                      <span class="badge badge-danger">✗ Unhealthy</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ provider_status.get('message') or provider_status.get('error') or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div style="display: flex; gap: 1rem; align-items: center;">
+            {% if status.status == 'healthy' %}
+              <span class="badge badge-success" style="font-size: 0.9rem; padding: 0.5rem 1rem;">✓ Healthy</span>
+            {% elif status.status == 'unconfigured' %}
+              <span class="badge badge-primary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">⚙️ Not Configured</span>
+            {% elif status.status == 'degraded' %}
+              <span class="badge badge-warning" style="font-size: 0.9rem; padding: 0.5rem 1rem;">⚠ Degraded</span>
+            {% else %}
+              <span class="badge badge-danger" style="font-size: 0.9rem; padding: 0.5rem 1rem;">✗ Unhealthy</span>
+            {% endif %}
+            <span>{{ status.get('message') or status.get('error') or 'No details available' }}</span>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="card">
+      <h2 class="card-title">📋 Health Monitoring Information</h2>
+      <table>
+        <tr>
+          <td><strong>Monitoring Status</strong></td>
+          <td>Active - Checking every 5 minutes</td>
+        </tr>
+        <tr>
+          <td><strong>Auto-Restart</strong></td>
+          <td>Enabled - Restarts after 3 consecutive failures</td>
+        </tr>
+        <tr>
+          <td><strong>Admin Alerts</strong></td>
+          <td>Enabled - Via Telegram on critical failures</td>
+        </tr>
+        <tr>
+          <td><strong>Checked Components</strong></td>
+          <td>Database, Bot, API, Cashfree, UPI Fallback</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">🔍 API Endpoints</h2>
+      <p>Get health data programmatically:</p>
+      <div class="button-group">
+        <a href="/api/health" target="_blank" class="btn btn-secondary">Quick Health Check</a>
+        <a href="/api/health/detailed" target="_blank" class="btn btn-secondary">Detailed Status</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

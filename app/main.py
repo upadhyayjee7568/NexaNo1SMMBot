@@ -24,6 +24,8 @@ def _startup() -> None:
 
         init_db()
         _DB_READY["done"] = True
+        logging.info("[STARTUP] Database initialized successfully")
+            
     except Exception:  # noqa: BLE001
         logging.getLogger("nexa").exception("init_db failed at startup")
 

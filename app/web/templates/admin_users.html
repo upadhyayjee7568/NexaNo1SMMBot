@@ -1,7 +1,80 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Admin - Users</h2></div>
-<div class="card"><table><tr><th>ID</th><th>Telegram</th><th>Role</th><th>Banned</th></tr>
-{% for u in users %}<tr><td>{{u.id}}</td><td>{{u.telegram_id}}</td><td>{{u.role}}</td><td>{{u.is_banned}}</td></tr>{% endfor %}
-</table></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin">📊 Dashboard</a></li>
+      <li><a href="/admin/users" class="active">👥 Users</a></li>
+      <li><a href="/admin/payments">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services">🛍️ Services</a></li>
+      <li><a href="/admin/tickets">🎟️ Tickets</a></li>
+      <li><a href="/admin/reports">📈 Reports</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-content">
+    <div class="breadcrumb">
+      <a href="/admin">📊 Admin</a> / <span>👥 Users</span>
+    </div>
+
+    <div class="card">
+      <h1 class="card-title">User Management</h1>
+      <p class="card-subtitle">View and manage all registered users ({{ users|length }} total)</p>
+    </div>
+
+    {% if users %}
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Telegram ID</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+              <tr>
+                <td><strong>#{{ u.id }}</strong></td>
+                <td>{{ u.telegram_id }}</td>
+                <td>
+                  {% if u.role == 'admin' %}
+                    <span class="badge badge-danger">Admin</span>
+                  {% elif u.role == 'moderator' %}
+                    <span class="badge badge-primary">Moderator</span>
+                  {% else %}
+                    <span class="badge badge-primary">User</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.is_banned %}
+                    <span class="badge badge-danger">🚫 Banned</span>
+                  {% else %}
+                    <span class="badge badge-success">✓ Active</span>
+                  {% endif %}
+                </td>
+                <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '—' }}</td>
+                <td>
+                  <a href="#" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">📋 Details</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">👤</div>
+          <h3>No Users Found</h3>
+          <p>There are no registered users yet.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

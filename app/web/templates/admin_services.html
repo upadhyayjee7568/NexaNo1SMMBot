@@ -1,7 +1,84 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Admin - Services</h2></div>
-<div class="card"><table><tr><th>ID</th><th>Provider</th><th>Service</th><th>Platform</th><th>Rate</th><th>Enabled</th></tr>
-{% for s in services %}<tr><td>{{s.id}}</td><td>{{s.provider_name}}</td><td>{{s.service_name}}</td><td>{{s.platform}}</td><td>{{s.base_rate}}</td><td>{{s.enabled}}</td></tr>{% endfor %}
-</table></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin">📊 Dashboard</a></li>
+      <li><a href="/admin/users">👥 Users</a></li>
+      <li><a href="/admin/payments">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services" class="active">🛍️ Services</a></li>
+      <li><a href="/admin/tickets">🎟️ Tickets</a></li>
+      <li><a href="/admin/reports">📈 Reports</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-content">
+    <div class="breadcrumb">
+      <a href="/admin">📊 Admin</a> / <span>🛍️ Services</span>
+    </div>
+
+    <div class="card">
+      <h1 class="card-title">Service Catalog Management</h1>
+      <p class="card-subtitle">Configure available services and pricing ({{ services|length }} total)</p>
+    </div>
+
+    {% if services %}
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Service ID</th>
+              <th>Provider</th>
+              <th>Service Name</th>
+              <th>Platform</th>
+              <th>Base Rate</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in services %}
+              <tr>
+                <td><strong>#{{ s.id }}</strong></td>
+                <td>{{ s.provider_name }}</td>
+                <td>{{ s.service_name }}</td>
+                <td>
+                  {% if s.platform == 'instagram' %}
+                    <span class="badge badge-primary">📷 Instagram</span>
+                  {% elif s.platform == 'tiktok' %}
+                    <span class="badge badge-primary">🎵 TikTok</span>
+                  {% elif s.platform == 'youtube' %}
+                    <span class="badge badge-primary">▶️ YouTube</span>
+                  {% elif s.platform == 'twitter' %}
+                    <span class="badge badge-primary">𝕏 Twitter</span>
+                  {% elif s.platform == 'facebook' %}
+                    <span class="badge badge-primary">f Facebook</span>
+                  {% else %}
+                    <span class="badge badge-primary">{{ s.platform }}</span>
+                  {% endif %}
+                </td>
+                <td>₹{{ "%.2f"|format(s.base_rate) }}</td>
+                <td>
+                  {% if s.enabled %}
+                    <span class="badge badge-success">✓ Enabled</span>
+                  {% else %}
+                    <span class="badge badge-danger">✗ Disabled</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">🛍️</div>
+          <h3>No Services Found</h3>
+          <p>No services have been configured yet.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

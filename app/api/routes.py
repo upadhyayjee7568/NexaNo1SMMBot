@@ -19,6 +19,7 @@ from app.services.platforms import platform_catalog
 from app.services.pricing import compute_final_amount, resolve_category
 from app.services.tickets import create_ticket, list_ticket_messages, list_tickets_by_telegram, reply_ticket
 from app.services.wallet import add_ledger_entry, wallet_balance
+from app.services.health_monitor import get_health_status
 
 router = APIRouter()
 
@@ -34,6 +35,12 @@ def get_db():
 @router.get('/health')
 def health() -> dict:
     return {'status': 'ok', 'service': settings.app_name, 'env': settings.environment}
+
+
+@router.get('/health/detailed')
+def health_detailed() -> dict:
+    """Get detailed system health status with component checks."""
+    return get_health_status()
 
 
 @router.get('/config/summary')

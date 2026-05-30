@@ -11,7 +11,7 @@ from app.core.settings import settings
 from app.db.models import Coupon, Order, PaymentTransaction, ServiceCatalog, Ticket, UpiTopup, User
 from app.services.auth import create_session, get_session, require_admin_access, require_csrf
 from app.services.growth import apply_coupon
-from app.services.wallet import wallet_balance
+from app.services.health_monitor import get_health_status
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
@@ -191,3 +191,29 @@ def admin_export_csv(request: Request, kind: str = "orders", db: Session = Depen
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={kind}.csv"},
     )
+
+
+@router.get("/health/dashboard")
+def health_dashboard(request: Request, db: Session = Depends(get_db)):
+    """Display system health status dashboard for admins."""
+    sess = _session(request, db)
+    require_admin_access(request, db, sess)
+    
+    health_status = get_health_status()
+    
+    return templates.TemplateResponse(
+        "health_dashboard.html",
+        {
+            "request": request,
+            "health": health_status,
+        },
+    )
+
+
+@router.get("/web/logout")
+def web_logout(request: Request):
+    """Logout user and clear session cookie."""
+    resp = RedirectResponse(url="/web/login", status_code=302)
+    resp.delete_cookie(settings.web_session_cookie_name)
+    resp.delete_cookie("csrf_token")
+    return resp

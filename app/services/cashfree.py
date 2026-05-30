@@ -91,3 +91,33 @@ async def create_payment_link(telegram_id: int, amount: Decimal, phone: str | No
     if not link_url:
         raise CashfreeError(f"no_link_url: {data}")
     return {"link_url": link_url, "link_id": data.get("link_id", link_id)}
+
+
+async def test_cashfree_health() -> dict:
+    """Test Cashfree payment gateway health."""
+    try:
+        if not is_configured():
+            return {"status": "unconfigured", "message": "Cashfree credentials not set"}
+        
+        # Test with a lightweight request to get the API version
+        headers = {
+            "x-client-id": settings.cashfree_app_id,
+            "x-client-secret": settings.cashfree_secret_key,
+            "x-api-version": API_VERSION,
+            "Content-Type": "application/json",
+        }
+        
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Try to fetch settlements as a health check
+            resp = await client.get(
+                f"{_base_url()}/settlements",
+                headers=headers
+            )
+            
+            if resp.status_code == 200 or resp.status_code == 401:
+                # 200 = healthy, 401 = configured but auth might fail (still good)
+                return {"status": "healthy", "message": "Cashfree gateway responding"}
+            else:
+                return {"status": "degraded", "message": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
