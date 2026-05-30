@@ -1,31 +1,128 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Customer Web App</h2>
-<p>Place orders, check wallet, view order history, and claim daily reward.</p></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/app" class="active">🏠 Home</a></li>
+      <li><a href="/app/wallet">💰 Wallet</a></li>
+      <li><a href="/app/orders">📦 My Orders</a></li>
+      <li><a href="/app/profile">👤 Profile</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
 
-<div class="card">
-<h3>Quick Actions</h3>
-<form method="get" action="/app/wallet">
-  <input name="telegram_id" placeholder="Telegram ID" required>
-  <button>Check Wallet</button>
-</form>
-</div>
+  <div class="main-content">
+    <div class="breadcrumb">
+      <span>🏠 Customer Panel</span>
+    </div>
 
-<div class="card">
-<h3>Order History</h3>
-<form method="get" action="/app/orders">
-  <input name="telegram_id" placeholder="Telegram ID" required>
-  <button>View Orders</button>
-</form>
-</div>
+    <div class="card">
+      <h1 class="card-title">Welcome back, User!</h1>
+      <p class="card-subtitle">Your social media growth platform</p>
+    </div>
 
-<div class="card">
-<h3>Coupon Apply</h3>
-<form method="post" action="/app/coupon/apply">
-  <input name="code" placeholder="COUPON CODE" required>
-  <input name="amount" placeholder="Amount" required>
-  <button>Apply Coupon</button>
-</form>
+    {% if result %}
+      <div class="alert alert-info">{{ result }}</div>
+    {% endif %}
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Wallet Balance</div>
+        <div class="stat-value">₹{{ balance }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Active Orders</div>
+        <div class="stat-value">{{ orders|length }}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">💳 Add Money to Wallet</h2>
+      <form method="get" action="/app/add-money">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" name="amount" placeholder="Enter amount (minimum ₹100)" min="100" required>
+        </div>
+        <div class="button-group">
+          <button type="submit" class="btn btn-primary">💳 Add Money</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">🎟️ Apply Coupon Code</h2>
+      <form method="post" action="/app/coupon/apply">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label>Coupon Code</label>
+            <input type="text" name="code" placeholder="e.g., SAVE50" required>
+          </div>
+          <div class="form-group">
+            <label>Amount (₹)</label>
+            <input type="number" name="amount" placeholder="Amount to discount" required>
+          </div>
+        </div>
+        <div class="button-group">
+          <button type="submit" class="btn btn-primary">✨ Apply Coupon</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">📦 Recent Orders (Last 20)</h2>
+      {% if orders %}
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Service</th>
+              <th>Provider</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td><strong>#{{ order.id }}</strong></td>
+                <td>{{ order.service_name or '—' }}</td>
+                <td>{{ order.provider_name }}</td>
+                <td>₹{{ "%.2f"|format(order.charge_amount) }}</td>
+                <td>
+                  {% if order.status == 'completed' %}
+                    <span class="badge badge-success">✓ Completed</span>
+                  {% elif order.status == 'processing' %}
+                    <span class="badge badge-primary">⚙️ Processing</span>
+                  {% elif order.status == 'pending' %}
+                    <span class="badge badge-warning">⏳ Pending</span>
+                  {% elif order.status == 'failed' %}
+                    <span class="badge badge-danger">✗ Failed</span>
+                  {% else %}
+                    <span class="badge badge-primary">{{ order.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">📦</div>
+          <h3>No Orders Yet</h3>
+          <p>Start by placing your first order to see it here.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">❓ Need Help?</h2>
+      <p>Contact us at <strong>@{{ support_username }}</strong> on Telegram for any issues or questions.</p>
+      <div class="button-group">
+        <a href="https://t.me/{{ support_username }}" target="_blank" class="btn btn-primary">💬 Message Support</a>
+      </div>
+    </div>
+  </div>
 </div>
-{% if result %}<div class="card"><pre>{{ result }}</pre></div>{% endif %}
 {% endblock %}

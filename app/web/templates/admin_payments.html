@@ -1,7 +1,136 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Admin - Payments</h2></div>
-<div class="card"><table><tr><th>ID</th><th>Gateway</th><th>Event</th><th>Amount</th><th>Status</th></tr>
-{% for p in payments %}<tr><td>{{p.id}}</td><td>{{p.gateway}}</td><td>{{p.gateway_event_id}}</td><td>{{p.amount}}</td><td>{{p.status}}</td></tr>{% endfor %}
-</table></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin">📊 Dashboard</a></li>
+      <li><a href="/admin/users">👥 Users</a></li>
+      <li><a href="/admin/payments" class="active">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services">🛍️ Services</a></li>
+      <li><a href="/admin/tickets">🎟️ Tickets</a></li>
+      <li><a href="/admin/reports">📈 Reports</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-content">
+    <div class="breadcrumb">
+      <a href="/admin">📊 Admin</a> / <span>💳 Payments & UPI</span>
+    </div>
+
+    <div class="card">
+      <h1 class="card-title">Payment Management</h1>
+      <p class="card-subtitle">Monitor transactions and manage UPI top-ups</p>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">💳 Payment Transactions ({{ payments|length }})</h2>
+      {% if payments %}
+        <table>
+          <thead>
+            <tr>
+              <th>Txn ID</th>
+              <th>Gateway</th>
+              <th>Event ID</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+              <tr>
+                <td><strong>#{{ p.id }}</strong></td>
+                <td>{{ p.gateway }}</td>
+                <td><code style="font-size: 0.8rem;">{{ p.gateway_event_id[:20] }}...</code></td>
+                <td>₹{{ "%.2f"|format(p.amount) }}</td>
+                <td>
+                  {% if p.status == 'success' %}
+                    <span class="badge badge-success">✓ Success</span>
+                  {% elif p.status == 'pending' %}
+                    <span class="badge badge-warning">⏳ Pending</span>
+                  {% elif p.status == 'failed' %}
+                    <span class="badge badge-danger">✗ Failed</span>
+                  {% else %}
+                    <span class="badge badge-primary">{{ p.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">💳</div>
+          <p>No transactions found</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">🤖 UPI Top-Ups (Auto-Fallback from Cashfree)</h2>
+      {% if upi_topups %}
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Amount</th>
+              <th>QR Code</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in upi_topups %}
+              <tr>
+                <td><strong>#{{ u.id }}</strong></td>
+                <td>User #{{ u.user_id }}</td>
+                <td><strong>₹{{ "%.2f"|format(u.amount) }}</strong></td>
+                <td>
+                  {% if u.qr_code_url %}
+                    <a href="{{ u.qr_code_url }}" target="_blank" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">📱 View QR</a>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.status == 'pending' %}
+                    <span class="badge badge-warning">⏳ Pending Approval</span>
+                  {% elif u.status == 'approved' %}
+                    <span class="badge badge-success">✓ Approved</span>
+                  {% elif u.status == 'rejected' %}
+                    <span class="badge badge-danger">✗ Rejected</span>
+                  {% else %}
+                    <span class="badge badge-primary">{{ u.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '—' }}</td>
+                <td>
+                  {% if u.status == 'pending' %}
+                    <form method="post" action="/admin/upi/{{ u.id }}/approve" style="display: inline;">
+                      <button type="submit" class="btn btn-success" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">✓ Approve</button>
+                    </form>
+                    <form method="post" action="/admin/upi/{{ u.id }}/reject" style="display: inline;">
+                      <button type="submit" class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">✗ Reject</button>
+                    </form>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-icon">🤖</div>
+          <p>No UPI top-ups found</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

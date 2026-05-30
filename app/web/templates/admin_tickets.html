@@ -1,7 +1,88 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Admin - Tickets</h2></div>
-<div class="card"><table><tr><th>Ref</th><th>User ID</th><th>Subject</th><th>Status</th><th>Priority</th></tr>
-{% for t in tickets %}<tr><td>{{t.ticket_ref}}</td><td>{{t.user_id}}</td><td>{{t.subject}}</td><td>{{t.status}}</td><td>{{t.priority}}</td></tr>{% endfor %}
-</table></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin">📊 Dashboard</a></li>
+      <li><a href="/admin/users">👥 Users</a></li>
+      <li><a href="/admin/payments">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services">🛍️ Services</a></li>
+      <li><a href="/admin/tickets" class="active">🎟️ Tickets</a></li>
+      <li><a href="/admin/reports">📈 Reports</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
+
+  <div class="main-content">
+    <div class="breadcrumb">
+      <a href="/admin">📊 Admin</a> / <span>🎟️ Support Tickets</span>
+    </div>
+
+    <div class="card">
+      <h1 class="card-title">Support Ticket Management</h1>
+      <p class="card-subtitle">Handle customer support requests ({{ tickets|length }} total)</p>
+    </div>
+
+    {% if tickets %}
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket Ref</th>
+              <th>User ID</th>
+              <th>Subject</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tickets %}
+              <tr>
+                <td><strong>{{ t.ticket_ref }}</strong></td>
+                <td>User #{{ t.user_id }}</td>
+                <td>{{ t.subject[:40] }}{% if t.subject|length > 40 %}...{% endif %}</td>
+                <td>
+                  {% if t.priority == 'critical' %}
+                    <span class="badge badge-danger">🔴 Critical</span>
+                  {% elif t.priority == 'high' %}
+                    <span class="badge badge-warning">🟠 High</span>
+                  {% elif t.priority == 'medium' %}
+                    <span class="badge badge-primary">🟡 Medium</span>
+                  {% else %}
+                    <span class="badge badge-primary">🟢 Low</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if t.status == 'open' %}
+                    <span class="badge badge-warning">📖 Open</span>
+                  {% elif t.status == 'in_progress' %}
+                    <span class="badge badge-primary">⚙️ In Progress</span>
+                  {% elif t.status == 'resolved' %}
+                    <span class="badge badge-success">✓ Resolved</span>
+                  {% else %}
+                    <span class="badge badge-primary">{{ t.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '—' }}</td>
+                <td>
+                  <a href="#" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">📋 View</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card">
+        <div class="empty-state">
+          <div class="empty-state-icon">🎟️</div>
+          <h3>No Tickets Found</h3>
+          <p>All support tickets have been resolved!</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

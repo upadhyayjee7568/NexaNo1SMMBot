@@ -1,32 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card"><h2>Admin Dashboard</h2>
-<p>Manage users, orders, tickets, services, and finance reports.</p></div>
+<div class="sidebar-layout">
+  <aside class="sidebar">
+    <ul class="sidebar-menu">
+      <li><a href="/admin" class="active">📊 Dashboard</a></li>
+      <li><a href="/admin/users">👥 Users</a></li>
+      <li><a href="/admin/payments">💳 Payments & UPI</a></li>
+      <li><a href="/admin/services">🛍️ Services</a></li>
+      <li><a href="/admin/tickets">🎟️ Tickets</a></li>
+      <li><a href="/admin/reports">📈 Reports</a></li>
+      <li><a href="/web/logout">🚪 Logout</a></li>
+    </ul>
+  </aside>
 
-<div class="card">
-<h3>Finance Daily Report</h3>
-<form method="get" action="/admin/finance" >
-  <input name="admin_tg" placeholder="Admin Telegram ID (X-Telegram-Id)" required>
-  <button>Load Report</button>
-</form>
-</div>
+  <div class="main-content">
+    <div class="breadcrumb">
+      <span>📊 Admin</span> / <span>Dashboard</span>
+    </div>
 
-<div class="card">
-<h3>Create Coupon</h3>
-<form method="post" action="/admin/coupons/create">
-  <input name="admin_tg" placeholder="Admin Telegram ID" required>
-  <input name="code" placeholder="CODE" required>
-  <input name="discount" placeholder="Discount %" required>
-  <button>Create</button>
-</form>
-</div>
+    <div class="card">
+      <h1 class="card-title">Admin Dashboard</h1>
+      <p class="card-subtitle">Real-time analytics and management tools for Nexa SMM Panel</p>
+    </div>
 
-<div class="card">
-<h3>Orders</h3>
-<form method="get" action="/admin/orders/view">
-  <input name="admin_tg" placeholder="Admin Telegram ID" required>
-  <button>Load Orders</button>
-</form>
+    {% if result %}
+      <div class="alert alert-info">{{ result }}</div>
+    {% endif %}
+
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value">{{ stats.users }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Active Orders</div>
+        <div class="stat-value">{{ stats.orders }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Payment Txns</div>
+        <div class="stat-value">{{ stats.payments }}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Pending UPI</div>
+        <div class="stat-value" style="color: var(--warning);">{{ stats.pending_upi }}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">🎟️ Create Coupon</h2>
+      <form method="post" action="/admin/coupons/create">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label>Coupon Code</label>
+            <input type="text" name="code" placeholder="e.g., SAVE50" required>
+          </div>
+          <div class="form-group">
+            <label>Discount (%)</label>
+            <input type="number" name="discount" placeholder="e.g., 50" min="0" max="100" required>
+          </div>
+        </div>
+        <div class="button-group">
+          <button type="submit" class="btn btn-primary">✨ Create Coupon</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">📊 Quick Actions</h2>
+      <div class="button-group">
+        <a href="/admin/users" class="btn btn-secondary">View All Users</a>
+        <a href="/admin/payments" class="btn btn-secondary">Manage Payments</a>
+        <a href="/admin/services" class="btn btn-secondary">Manage Services</a>
+        <a href="/admin/tickets" class="btn btn-secondary">View Tickets</a>
+        <a href="/admin/reports/export/csv?kind=orders" class="btn btn-secondary">📥 Export Orders</a>
+        <a href="/admin/reports/export/csv?kind=payments" class="btn btn-secondary">📥 Export Payments</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">ℹ️ System Info</h2>
+      <table>
+        <tr>
+          <td>Panel Version</td>
+          <td><span class="badge badge-primary">v2.0.0</span></td>
+        </tr>
+        <tr>
+          <td>Database Status</td>
+          <td><span class="badge badge-success">Connected</span></td>
+        </tr>
+        <tr>
+          <td>Last Updated</td>
+          <td>{{ now | default('Just now') }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
 </div>
-{% if result %}<div class="card"><pre>{{ result }}</pre></div>{% endif %}
 {% endblock %}
